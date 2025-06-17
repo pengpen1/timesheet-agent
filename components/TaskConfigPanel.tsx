@@ -8,6 +8,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Plus, Trash2, Calendar, Loader2, Sparkles } from "lucide-react";
 import type { ProjectConfig } from "@/lib/types";
+import { generateWorkDays } from "@/lib/utils";
 
 interface TaskConfigPanelProps {
   currentConfig: ProjectConfig;
@@ -30,6 +31,21 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
   deleteTask,
   handleGenerateTimesheet,
 }) => {
+  // 计算工作日天数和总目标工时
+  const workDays = generateWorkDays(
+    currentConfig.dateRange.startDate,
+    currentConfig.dateRange.endDate,
+    currentConfig.workingHours.dailyHours,
+    currentConfig.workingHours.excludeWeekends,
+    currentConfig.workingHours.excludeHolidays
+  );
+  const workdayCount = workDays.filter((d) => d.isWorkday).length;
+  const dailyHours = currentConfig.workingHours.dailyHours;
+  const totalTargetHours = workdayCount * dailyHours;
+  const assignedHours = currentConfig.tasks.reduce((sum, t) => sum + Number(t.totalHours), 0);
+  const remainingHours = Math.max(0, totalTargetHours - assignedHours);
+  const isOver = assignedHours > totalTargetHours;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -41,6 +57,16 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
               任务管理
             </CardTitle>
             <CardDescription>添加和配置您的工作任务</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="outline">已分配工时：{assignedHours} / {totalTargetHours} 小时</Badge>
+              {isOver ? (
+                <Badge variant="destructive">已超出目标工时</Badge>
+              ) : remainingHours === 0 ? (
+                <Badge variant="default">工时已填满</Badge>
+              ) : (
+                <Badge variant="secondary">剩余工时：{remainingHours} 小时</Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
@@ -137,11 +163,14 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
               工作参数
             </CardTitle>
             <CardDescription>配置工作时间和分配策略</CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="outline">日期范围内需填写 {workdayCount} 天 × {dailyHours} 小时 = {totalTargetHours} 小时</Badge>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 日期范围 */}
             <div className="space-y-3">
-              <Label>工作日期</Label>
+              <Label>日期范围</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">开始日期</Label>

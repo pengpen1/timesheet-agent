@@ -17,7 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { ModelConfigService, MODEL_PROVIDERS as BASE_MODEL_PROVIDERS } from "@/lib/model-config";
+import {
+  ModelConfigService,
+  MODEL_PROVIDERS as BASE_MODEL_PROVIDERS,
+} from "@/lib/model-config";
 import { ModelConfig } from "@/lib/types";
 import {
   Settings,
@@ -36,7 +39,7 @@ const EXTRA_MODEL_PROVIDERS = [
     displayName: "Google Gemini",
     baseURL: "https://generativelanguage.googleapis.com/v1beta",
     requiresAuth: true,
-    models: ["gemini-pro", "gemini-1.5-pro", "gemini-ultra"]
+    models: ["gemini-pro", "gemini-1.5-pro", "gemini-ultra"],
   },
   {
     id: "wenxin",
@@ -44,15 +47,16 @@ const EXTRA_MODEL_PROVIDERS = [
     displayName: "百度文心一言",
     baseURL: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop",
     requiresAuth: true,
-    models: ["ernie-bot", "ernie-bot-turbo", "ernie-bot-4.0"]
+    models: ["ernie-bot", "ernie-bot-turbo", "ernie-bot-4.0"],
   },
   {
     id: "qwen",
     name: "qwen",
     displayName: "阿里通义千问",
-    baseURL: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+    baseURL:
+      "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
     requiresAuth: true,
-    models: ["qwen-turbo", "qwen-plus", "qwen-max"]
+    models: ["qwen-turbo", "qwen-plus", "qwen-max"],
   },
   {
     id: "minimax",
@@ -60,7 +64,7 @@ const EXTRA_MODEL_PROVIDERS = [
     displayName: "MiniMax",
     baseURL: "https://api.minimax.chat/v1",
     requiresAuth: true,
-    models: ["abab5.5-chat", "abab6-chat"]
+    models: ["abab5.5-chat", "abab6-chat"],
   },
   {
     id: "spark",
@@ -68,7 +72,7 @@ const EXTRA_MODEL_PROVIDERS = [
     displayName: "讯飞星火",
     baseURL: "https://spark-api.xf-yun.com/v1.1/chat",
     requiresAuth: true,
-    models: ["spark-v3.5", "spark-v3.1"]
+    models: ["spark-v3.5", "spark-v3.1"],
   },
   {
     id: "baichuan",
@@ -76,15 +80,15 @@ const EXTRA_MODEL_PROVIDERS = [
     displayName: "百川大模型",
     baseURL: "https://api.baichuan-ai.com/v1/chat",
     requiresAuth: true,
-    models: ["Baichuan2-Turbo", "Baichuan2-53B"]
-  }
+    models: ["Baichuan2-Turbo", "Baichuan2-53B"],
+  },
 ];
 const MODEL_PROVIDERS = [...BASE_MODEL_PROVIDERS, ...EXTRA_MODEL_PROVIDERS];
 
 export const ModelConfigPanel: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<string>(() => {
     // 初始化时读取本地存储的 activeProvider
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const store = ModelConfigService.getConfig();
         return store.activeProvider || "openai";
@@ -113,7 +117,9 @@ export const ModelConfigPanel: React.FC = () => {
   } | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const currentProvider = MODEL_PROVIDERS.find((p) => p.id === selectedProvider);
+  const currentProvider = MODEL_PROVIDERS.find(
+    (p) => p.id === selectedProvider
+  );
 
   // 只在首次挂载时初始化 config
   useEffect(() => {
@@ -292,7 +298,7 @@ export const ModelConfigPanel: React.FC = () => {
                 <Input
                   id="model"
                   value={config.model}
-                  onChange={e => updateConfig("model", e.target.value)}
+                  onChange={(e) => updateConfig("model", e.target.value)}
                   placeholder={currentProvider.models[0] || "请输入模型ID"}
                 />
                 <div className="flex flex-wrap gap-2 mt-1">
@@ -307,7 +313,9 @@ export const ModelConfigPanel: React.FC = () => {
                     </Button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">可手动输入或点击下方推荐模型ID</p>
+                <p className="text-xs text-muted-foreground">
+                  可手动输入或点击下方推荐模型ID
+                </p>
               </div>
               {/* 测试结果 */}
               {testResult && (
@@ -373,7 +381,9 @@ export const ModelConfigPanel: React.FC = () => {
       <Card className="mt-4">
         <CardHeader>
           <CardTitle className="text-base">高级参数设置（可选）</CardTitle>
-          <CardDescription>适用于进阶用户，调整生成效果</CardDescription>
+          <CardDescription>
+            适用于进阶用户，调整生成效果，绑定于上方模型设置，设置修改后请点击上方"保存"按钮生效
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
@@ -418,9 +428,9 @@ export const ModelConfigPanel: React.FC = () => {
                 min="0"
                 max="1"
                 step="0.01"
-                value={(config as any).top_p ?? 1}
+                value={config.top_p}
                 onChange={(e) =>
-                  updateConfig("top_p" as any, parseFloat(e.target.value))
+                  updateConfig("top_p", parseFloat(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground">
@@ -437,12 +447,9 @@ export const ModelConfigPanel: React.FC = () => {
                 min="-2"
                 max="2"
                 step="0.01"
-                value={(config as any).presence_penalty ?? 0}
+                value={config.presence_penalty}
                 onChange={(e) =>
-                  updateConfig(
-                    "presence_penalty" as any,
-                    parseFloat(e.target.value)
-                  )
+                  updateConfig("presence_penalty", parseFloat(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground">
@@ -459,18 +466,26 @@ export const ModelConfigPanel: React.FC = () => {
                 min="-2"
                 max="2"
                 step="0.01"
-                value={(config as any).frequency_penalty ?? 0}
+                value={config.frequency_penalty}
                 onChange={(e) =>
-                  updateConfig(
-                    "frequency_penalty" as any,
-                    parseFloat(e.target.value)
-                  )
+                  updateConfig("frequency_penalty", parseFloat(e.target.value))
                 }
               />
               <p className="text-xs text-muted-foreground">
                 降低重复内容概率，-2~2，越高越不重复。
               </p>
             </div>
+          </div>
+          <div className="space-y-2 mt-6">
+            <Label htmlFor="rules">系统级Prompt（定制规则，可选）</Label>
+            <textarea
+              id="rules"
+              className="w-full min-h-[64px] rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={config.rules || ""}
+              onChange={e => updateConfig("rules", e.target.value)}
+              placeholder="自定义AI输出风格、格式等，如：工作内容返回格式为 【项目】完成***功能"
+            />
+            <p className="text-xs text-muted-foreground">可输入系统级提示词，定制AI输出风格和内容</p>
           </div>
         </CardContent>
       </Card>

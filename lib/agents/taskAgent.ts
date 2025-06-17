@@ -63,7 +63,40 @@ export class TaskAgent {
     try {
       // 构建提示词
       const prompt = this.buildPrompt(result, originalTasks)
-      
+      // 构建 system prompt
+      let systemPrompt = '你是一个专业的工时管理助手，擅长生成简洁、专业的工作内容描述。请根据任务信息生成符合企业工时表标准的工作描述。';
+      if (modelConfig.rules && modelConfig.rules.trim()) {
+        systemPrompt = systemPrompt + '\n' + modelConfig.rules.trim();
+      }
+      // 智能参数适配
+      const provider = modelConfig.provider;
+      // 支持全部参数的主流大模型
+      const fullSupportProviders = [
+        'openai', 'moonshot', 'azure', 'anyscale', 'deepseek', 'zhipu', 'baichuan', 'minimax', 'spark', 'qwen'
+      ];
+      // 只支持基础参数的模型
+      const basicSupportProviders = ['gemini', 'wenxin'];
+      // 构建请求体
+      const requestBody: any = {
+        model: modelConfig.model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: modelConfig.temperature ?? 0.7,
+        max_tokens: modelConfig.maxTokens ?? 20000,
+      };
+      if (fullSupportProviders.includes(provider)) {
+        if (typeof modelConfig.top_p === 'number') requestBody.top_p = modelConfig.top_p;
+        if (typeof modelConfig.presence_penalty === 'number') requestBody.presence_penalty = modelConfig.presence_penalty;
+        if (typeof modelConfig.frequency_penalty === 'number') requestBody.frequency_penalty = modelConfig.frequency_penalty;
+      }
       // 调用AI模型
       const response = await fetch(`${modelConfig.baseURL}/chat/completions`, {
         method: 'POST',
@@ -71,21 +104,7 @@ export class TaskAgent {
           'Authorization': `Bearer ${modelConfig.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: modelConfig.model,
-          messages: [
-            {
-              role: 'system',
-              content: '你是一个专业的工时管理助手，擅长生成简洁、专业的工作内容描述。请根据任务信息生成符合企业工时表标准的工作描述。'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: modelConfig.temperature || 0.7,
-          max_tokens: modelConfig.maxTokens || 2048,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
