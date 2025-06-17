@@ -23,6 +23,26 @@ export class TaskAgent {
     // 过滤出工作日
     const validWorkDays = workDays.filter(day => day.isWorkday && !day.isHoliday)
     
+    // 尝试使用AI进行智能分配
+    const modelConfig = ModelConfigService.getActiveConfig()
+    if (modelConfig && modelConfig.apiKey) {
+      try {
+        console.log('使用AI进行智能工时分配...')
+        const aiResult = await this.distributeWithAI(tasks, validWorkDays, distributionMode, modelConfig)
+        if (aiResult) {
+          console.log('AI分配成功，跳过传统分配策略')
+          // 仍然使用AI增强工作描述
+          try {
+            return await this.enhanceWithAI(aiResult, tasks)
+          } catch (error) {
+            console.warn('AI描述增强失败，使用AI分配结果:', error)
+            return aiResult
+          }
+        }
+      } catch (error) {
+        console.warn('AI分配失败，使用传统分配策略:', error)
+      }
+    }
     // 根据分配模式执行不同策略
     let result: TaskAgentOutput
     switch (distributionMode) {
@@ -173,7 +193,7 @@ ${assignmentSummary}
 1. 描述要具体且专业
 2. 体现实际工作内容
 3. 符合软件开发工时表标准
-4. 每个描述不超过20字
+4. 每个描述不超过30字
 
 请按以下JSON格式返回：
 {
@@ -410,5 +430,210 @@ ${assignmentSummary}
     }
     
     return baseDescription
+  }
+
+  /**
+   * 使用AI进行智能工时分配
+   */
+  private static async distributeWithAI(
+    tasks: Task[], 
+    workDays: WorkDay[], 
+    distributionMode: string,
+    modelConfig: any
+  ): Promise<TaskAgentOutput | null> {
+    try {
+      // 构建AI分配提示词
+      const prompt = this.buildDistributionPrompt(tasks, workDays, distributionMode)
+      
+      // 构建system prompt
+      let systemPrompt = `你是一个专业的工时分配助手，擅长根据任务特点和分配策略，制定合理的每日工作安排。
+
+请根据提供的任务信息、工作日信息和分配策略，智能分配每日工时。
+
+分配策略说明：
+- 按天平均分配(daily)：将任务工时尽量均匀分布到每个工作日，保持工作负荷平衡
+- 按优先级分配(priority)：优先安排高优先级任务，确保重要工作优先完成
+- 按功能分配(feature)：将相关功能的任务集中安排，提高工作连贯性和效率
+
+输出要求：
+1. 每天的总工时不应超过对应工作日的plannedHours
+2. 所有任务的总工时应该被合理分配完毕
+3. 分配结果要符合人类工作习惯，避免频繁切换任务
+4. 严格按照指定的JSON格式输出`;
+      
+      if (modelConfig.rules && modelConfig.rules.trim()) {
+        systemPrompt = systemPrompt + '\n\n用户自定义规则：\n' + modelConfig.rules.trim();
+      }
+      
+      // 智能参数适配
+      const provider = modelConfig.provider;
+      const fullSupportProviders = [
+        'openai', 'moonshot', 'azure', 'anyscale', 'deepseek', 'zhipu', 'baichuan', 'minimax', 'spark', 'qwen'
+      ];
+      
+      const requestBody: any = {
+        model: modelConfig.model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: modelConfig.temperature ?? 0.7,
+        max_tokens: modelConfig.maxTokens ?? 4000,
+      };
+      
+      if (fullSupportProviders.includes(provider)) {
+        if (typeof modelConfig.top_p === 'number') requestBody.top_p = modelConfig.top_p;
+        if (typeof modelConfig.presence_penalty === 'number') requestBody.presence_penalty = modelConfig.presence_penalty;
+        if (typeof modelConfig.frequency_penalty === 'number') requestBody.frequency_penalty = modelConfig.frequency_penalty;
+      }
+      
+      // 调用AI模型
+      const response = await fetch(`${modelConfig.baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${modelConfig.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`AI API调用失败: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      // 多格式兼容解析AI响应
+      let aiResponse = '';
+      if (data.choices?.[0]?.message?.content) {
+        aiResponse = data.choices[0].message.content;
+      } else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        aiResponse = data.candidates[0].content.parts[0].text;
+      } else if (typeof data.result === 'string') {
+        aiResponse = data.result;
+      } else if (typeof data.output?.text === 'string') {
+        aiResponse = data.output.text;
+      } else if (Array.isArray(data.output) && data.output[0]?.content?.[0]?.text) {
+        aiResponse = data.output[0].content[0].text;
+      } else if (Array.isArray(data.output) && data.output[0]?.text) {
+        aiResponse = data.output[0].text;
+      }
+      
+      if (aiResponse && typeof aiResponse === 'string' && aiResponse.trim()) {
+        return this.parseAIDistributionResponse(aiResponse)
+      } else {
+        throw new Error('AI返回格式错误')
+      }
+      
+    } catch (error) {
+      console.error('AI工时分配失败:', error)
+      return null
+    }
+  }
+
+  /**
+   * 构建AI分配提示词
+   */
+  private static buildDistributionPrompt(tasks: Task[], workDays: WorkDay[], distributionMode: string): string {
+    const taskSummary = tasks.map(task => 
+      `- ${task.name} (${task.totalHours}h, 优先级: ${task.priority}${task.description ? ', 描述: ' + task.description : ''})`
+    ).join('\n')
+    
+    const workDaysSummary = workDays.map(day => 
+      `- ${day.date} (${day.plannedHours}h)`
+    ).join('\n')
+    
+    const modeDescription = {
+      'daily': '按天平均分配：将任务工时尽量均匀分布到每个工作日',
+      'priority': '按优先级分配：优先安排高优先级任务，确保重要工作优先完成', 
+      'feature': '按功能分配：将相关功能的任务集中安排在连续的时间内'
+    }[distributionMode] || '按天平均分配'
+    
+    return `
+任务列表：
+${taskSummary}
+
+工作日列表：
+${workDaysSummary}
+
+分配策略：${modeDescription}
+
+请根据上述信息，智能分配每日工时。要求：
+1. 每个任务的总工时必须被完全分配
+2. 每天的分配工时不能超过该天的plannedHours
+3. 分配要符合所选策略的特点
+4. 考虑实际工作习惯，避免每天任务过于分散
+
+请按以下JSON格式返回分配结果：
+{
+  "dailyAssignments": [
+    {
+      "date": "2025-06-01",
+      "tasks": [
+        {
+          "taskId": "task_id",
+          "taskName": "任务名称",
+          "allocatedHours": 4.0,
+          "workDescription": "具体工作描述"
+        }
+      ],
+      "totalHours": 8.0
+    }
+  ]
+}
+`
+  }
+
+  /**
+   * 解析AI分配响应
+   */
+  private static parseAIDistributionResponse(aiResponse: string): TaskAgentOutput | null {
+    try {
+      // 提取JSON部分
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        throw new Error('未找到JSON格式的响应')
+      }
+      
+      const aiData = JSON.parse(jsonMatch[0])
+      
+      if (!aiData.dailyAssignments || !Array.isArray(aiData.dailyAssignments)) {
+        throw new Error('AI响应格式错误：缺少dailyAssignments字段')
+      }
+      
+      // 验证和转换数据格式
+      const dailyAssignments = aiData.dailyAssignments.map((assignment: any) => {
+        if (!assignment.date || !assignment.tasks || !Array.isArray(assignment.tasks)) {
+          throw new Error('AI响应格式错误：每日分配格式不正确')
+        }
+        
+        const tasks = assignment.tasks.map((task: any) => {
+          return {
+            taskId: task.taskId || '',
+            taskName: task.taskName || '',
+            allocatedHours: Number(task.allocatedHours) || 0,
+            workDescription: task.workDescription || `${task.taskName}相关工作`
+          }
+        })
+        
+        return {
+          date: assignment.date,
+          tasks,
+          totalHours: tasks.reduce((sum: number, t: any) => sum + t.allocatedHours, 0)
+        }
+      })
+      
+      return { dailyAssignments }
+      
+    } catch (error) {
+      console.error('解析AI分配响应失败:', error)
+      return null
+    }
   }
 } 

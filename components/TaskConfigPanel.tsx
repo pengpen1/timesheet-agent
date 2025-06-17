@@ -45,9 +45,40 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
   const assignedHours = currentConfig.tasks.reduce((sum, t) => sum + Number(t.totalHours), 0);
   const remainingHours = Math.max(0, totalTargetHours - assignedHours);
   const isOver = assignedHours > totalTargetHours;
+  const canGenerate = assignedHours >= totalTargetHours;
 
   return (
     <div className="space-y-6">
+      {/* 工时统计总览 - 更显眼的位置 */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 p-2 rounded-full">
+                <Calendar className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">目标工时</p>
+                <p className="text-xl font-bold text-blue-700">
+                  {workdayCount} 天 × {dailyHours} 小时 = {totalTargetHours} 小时
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="text-sm">
+                已分配：{assignedHours} / {totalTargetHours} 小时
+              </Badge>
+              {isOver ? (
+                <Badge variant="default">超出目标工时</Badge>
+              ) : remainingHours === 0 ? (
+                <Badge variant="default" className="bg-green-600">工时已填满</Badge>
+              ) : (
+                <Badge variant="secondary">剩余：{remainingHours} 小时</Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 任务管理 */}
         <Card>
@@ -57,16 +88,6 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
               任务管理
             </CardTitle>
             <CardDescription>添加和配置您的工作任务</CardDescription>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline">已分配工时：{assignedHours} / {totalTargetHours} 小时</Badge>
-              {isOver ? (
-                <Badge variant="destructive">已超出目标工时</Badge>
-              ) : remainingHours === 0 ? (
-                <Badge variant="default">工时已填满</Badge>
-              ) : (
-                <Badge variant="secondary">剩余工时：{remainingHours} 小时</Badge>
-              )}
-            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
@@ -163,9 +184,6 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
               工作参数
             </CardTitle>
             <CardDescription>配置工作时间和分配策略</CardDescription>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <Badge variant="outline">日期范围内需填写 {workdayCount} 天 × {dailyHours} 小时 = {totalTargetHours} 小时</Badge>
-            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 日期范围 */}
@@ -277,15 +295,6 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
                 </SelectContent>
               </Select>
             </div>
-            {/* 工作内容模板 */}
-            <div className="space-y-2">
-              <Label>工作内容模板（可选）</Label>
-              <Input
-                value={currentConfig.workContent}
-                onChange={e => updateConfig({ workContent: e.target.value })}
-                placeholder="自定义工作内容描述模板"
-              />
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -295,7 +304,7 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
           <div className="space-y-4">
             <Button
               onClick={handleGenerateTimesheet}
-              disabled={isGenerating || currentConfig.tasks.length === 0}
+              disabled={isGenerating || currentConfig.tasks.length === 0 || !canGenerate}
               className="w-full h-12 text-lg flex items-center gap-3"
             >
               {isGenerating ? (
@@ -310,6 +319,11 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
                 </>
               )}
             </Button>
+            {!canGenerate && currentConfig.tasks.length > 0 && (
+              <p className="text-sm text-amber-600 text-center">
+                请继续添加任务，还需分配 {remainingHours} 小时工时
+              </p>
+            )}
             {isGenerating && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
