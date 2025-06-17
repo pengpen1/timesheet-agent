@@ -25,6 +25,19 @@ export interface TimesheetEntry {
   isEditable: boolean
 }
 
+// 工作制度类型
+export type WorkScheduleType = 'single' | 'double' | 'alternate'
+
+export interface WorkingHours {
+  dailyHours: number
+  excludeHolidays: boolean
+  scheduleType: WorkScheduleType
+  // 单休配置
+  singleRestDay?: 'saturday' | 'sunday'
+  // 大小周配置
+  isCurrentWeekBig?: boolean
+}
+
 export interface ProjectConfig {
   tasks: Task[]
   workContent?: string
@@ -32,11 +45,7 @@ export interface ProjectConfig {
     startDate: string
     endDate: string
   }
-  workingHours: {
-    dailyHours: number
-    excludeWeekends: boolean
-    excludeHolidays: boolean
-  }
+  workingHours: WorkingHours
   distributionMode: 'daily' | 'feature' | 'priority'
   autoSave: boolean
 }

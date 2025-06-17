@@ -99,8 +99,10 @@ export default function TimesheetAgentPage() {
         currentConfig.dateRange.startDate,
         currentConfig.dateRange.endDate,
         currentConfig.workingHours.dailyHours,
-        currentConfig.workingHours.excludeWeekends,
-        currentConfig.workingHours.excludeHolidays
+        currentConfig.workingHours.scheduleType,
+        currentConfig.workingHours.excludeHolidays,
+        currentConfig.workingHours.singleRestDay,
+        currentConfig.workingHours.isCurrentWeekBig
       );
 
       setProcessingStep("TaskAgent正在智能分配任务...");
@@ -256,7 +258,7 @@ export default function TimesheetAgentPage() {
               />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-              TimesheetAgent
+              TimesheetAgent <small className="text-2xl text-gray-500 font-normal">v1.1.0</small>
             </h1>
           </div>
           <p className="text-lg text-muted-foreground mb-6">

@@ -59,8 +59,8 @@ const defaultConfig: ProjectConfig = {
   dateRange: getCurrentMonthRange(),
   workingHours: {
     dailyHours: 8,
-    excludeWeekends: true,
-    excludeHolidays: true
+    excludeHolidays: true,
+    scheduleType: 'double'
   },
   distributionMode: 'daily',
   autoSave: true

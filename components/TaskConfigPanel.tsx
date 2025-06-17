@@ -6,9 +6,9 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
-import { Plus, Trash2, Calendar, Loader2, Sparkles } from "lucide-react";
-import type { ProjectConfig } from "@/lib/types";
-import { generateWorkDays } from "@/lib/utils";
+import { Plus, Trash2, Calendar, Loader2, Sparkles, CalendarDays, CalendarRange } from "lucide-react";
+import type { ProjectConfig } from "@/types/types";
+import { generateWorkDays, getCurrentWeekRange, getCurrentMonthRange } from "@/lib/utils";
 
 interface TaskConfigPanelProps {
   currentConfig: ProjectConfig;
@@ -16,7 +16,7 @@ interface TaskConfigPanelProps {
   processingStep: string;
   progress: number;
   updateConfig: (config: Partial<ProjectConfig>) => void;
-  addTask: (task: Omit<import("@/lib/types").Task, "id">) => void;
+  addTask: (task: Omit<import("@/types/types").Task, "id">) => void;
   deleteTask: (taskId: string) => void;
   handleGenerateTimesheet: () => void;
 }
@@ -36,8 +36,10 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
     currentConfig.dateRange.startDate,
     currentConfig.dateRange.endDate,
     currentConfig.workingHours.dailyHours,
-    currentConfig.workingHours.excludeWeekends,
-    currentConfig.workingHours.excludeHolidays
+    currentConfig.workingHours.scheduleType,
+    currentConfig.workingHours.excludeHolidays,
+    currentConfig.workingHours.singleRestDay,
+    currentConfig.workingHours.isCurrentWeekBig
   );
   const workdayCount = workDays.filter((d) => d.isWorkday).length;
   const dailyHours = currentConfig.workingHours.dailyHours;
@@ -189,6 +191,32 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
             {/* 日期范围 */}
             <div className="space-y-3">
               <Label>日期范围</Label>
+              <div className="flex gap-2 mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const weekRange = getCurrentWeekRange()
+                    updateConfig({ dateRange: weekRange })
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <CalendarDays className="h-3 w-3" />
+                  当前周
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const monthRange = getCurrentMonthRange()
+                    updateConfig({ dateRange: monthRange })
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <CalendarRange className="h-3 w-3" />
+                  当前月
+                </Button>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">开始日期</Label>
@@ -243,23 +271,88 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
                   step="0.5"
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="excludeWeekends"
-                  checked={currentConfig.workingHours.excludeWeekends}
-                  onChange={e =>
+              
+              {/* 工作制度选择 */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">工作制度</Label>
+                <Select
+                  value={currentConfig.workingHours.scheduleType}
+                  onValueChange={(value: 'single' | 'double' | 'alternate') => {
                     updateConfig({
                       workingHours: {
                         ...currentConfig.workingHours,
-                        excludeWeekends: e.target.checked,
+                        scheduleType: value,
+                        // 重置相关配置
+                        singleRestDay: value === 'single' ? 'sunday' : undefined,
+                        isCurrentWeekBig: value === 'alternate' ? true : undefined,
                       },
                     })
-                  }
-                  className="rounded"
-                />
-                <Label htmlFor="excludeWeekends">排除双休日</Label>
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="double">双休（周六周日休息）</SelectItem>
+                    <SelectItem value="single">单休（一天休息）</SelectItem>
+                    <SelectItem value="alternate">大小周（轮换休息）</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* 单休配置 */}
+              {currentConfig.workingHours.scheduleType === 'single' && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">休息日</Label>
+                  <Select
+                    value={currentConfig.workingHours.singleRestDay || 'sunday'}
+                    onValueChange={(value: 'saturday' | 'sunday') => {
+                      updateConfig({
+                        workingHours: {
+                          ...currentConfig.workingHours,
+                          singleRestDay: value,
+                        },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sunday">周日</SelectItem>
+                      <SelectItem value="saturday">周六</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* 大小周配置 */}
+              {currentConfig.workingHours.scheduleType === 'alternate' && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">本周是否为大周</Label>
+                  <Select
+                    value={currentConfig.workingHours.isCurrentWeekBig ? 'true' : 'false'}
+                    onValueChange={(value: string) => {
+                      updateConfig({
+                        workingHours: {
+                          ...currentConfig.workingHours,
+                          isCurrentWeekBig: value === 'true',
+                        },
+                      })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">大周（只休周日）</SelectItem>
+                      <SelectItem value="false">小周（休周六周日）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* 法定节假日设置 */}
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"

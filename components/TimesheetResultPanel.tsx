@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { FileText, Download, Copy, Table, Clock, Calendar, BarChart3, Sparkles } from "lucide-react";
-import type { TimesheetResult, TimesheetEntry } from "@/lib/types";
+import type { TimesheetResult, TimesheetEntry } from "@/types/types";
 
 interface TimesheetResultPanelProps {
   currentResult: TimesheetResult | null;

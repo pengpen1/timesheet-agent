@@ -21,7 +21,7 @@ import {
   ModelConfigService,
   MODEL_PROVIDERS as BASE_MODEL_PROVIDERS,
 } from "@/lib/model-config";
-import { ModelConfig } from "@/lib/types";
+import { ModelConfig } from "@/types/types";
 import {
   Settings,
   Wifi,
