@@ -4,8 +4,8 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { ProjectConfig, TimesheetResult, TimesheetEntry, Task } from './types'
-import { getCurrentMonthRange } from './utils'
+import { ProjectConfig, TimesheetResult, TimesheetEntry, Task } from '../types/types'
+import { getCurrentMonthRange } from '../lib/utils'
 
 interface TimesheetStore {
   // 项目配置状态

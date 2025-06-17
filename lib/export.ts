@@ -3,7 +3,7 @@
 // }}
 
 import * as XLSX from 'xlsx'
-import { TimesheetEntry } from './types'
+import { TimesheetEntry } from '../types/types'
 import { format } from 'date-fns'
 
 /**

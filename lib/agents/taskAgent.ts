@@ -2,7 +2,7 @@
 // Action: Added; Timestamp: 2025-06-16 11:20:34 +08:00; Reason: P2-AGENT-001 实现TaskAgent核心逻辑; Principle_Applied: SOLID-S(单一职责原则);
 // }}
 
-import { Task, WorkDay, TaskAgentInput, TaskAgentOutput } from '../types'
+import { Task, WorkDay, TaskAgentInput, TaskAgentOutput } from '../../types/types'
 import { format, differenceInDays } from 'date-fns'
 import { ModelConfigService } from '../model-config'
 

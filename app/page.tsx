@@ -35,15 +35,16 @@ import {
   Table,
   Loader2
 } from "lucide-react";
-import { useTimesheetStore } from "@/lib/store";
+import { useTimesheetStore } from "@/store/store";
 import { TaskAgent } from "@/lib/agents/taskAgent";
 import { TimesheetAgent } from "@/lib/agents/timesheetAgent";
 import { ExportService } from "@/lib/export";
 import { generateWorkDays } from "@/lib/utils";
-import { TimesheetEntry } from "@/lib/types";
+import { TimesheetEntry } from "@/types/types";
 import { TaskConfigPanel } from "@/components/TaskConfigPanel";
 import { TimesheetResultPanel } from "@/components/TimesheetResultPanel";
 import { ModelConfigPanel } from "@/components/ModelConfigPanel";
+import Image from "next/image";
 
 export default function TimesheetAgentPage() {
   const {
@@ -245,7 +246,14 @@ export default function TimesheetAgentPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-yellow-500" />
+              <Image
+                src="/images/avatar.png"
+                alt="Avatar"
+                width={32}
+                height={32}
+                className="rounded-full object-cover"
+                style={{ objectFit: 'cover' }}
+              />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
               TimesheetAgent

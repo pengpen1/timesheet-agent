@@ -1,4 +1,4 @@
-import { ModelProvider, ModelConfig, ModelConfigStore } from './types'
+import { ModelProvider, ModelConfig, ModelConfigStore } from '../types/types'
 
 // 预定义的模型提供商
 export const MODEL_PROVIDERS: ModelProvider[] = [

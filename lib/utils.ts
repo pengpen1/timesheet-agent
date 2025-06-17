@@ -1,6 +1,6 @@
 // 通用工具函数库
 
-import { WorkDay } from './types'
+import { WorkDay } from '../types/types'
 import { format, addDays, isWeekend, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
