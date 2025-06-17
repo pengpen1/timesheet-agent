@@ -108,44 +108,87 @@ export class ModelConfigService {
   // 测试模型连通性
   static async testConnection(config: ModelConfig): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await fetch(`${config.baseURL}/models`, {
-        method: 'GET',
+      // 先尝试 /models 请求
+      try {
+        const modelsResponse = await fetch(`${config.baseURL}/models`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(10000) // 10秒超时
+        })
+
+        if (modelsResponse.ok) {
+          const data = await modelsResponse.json()
+          
+          // 检查是否包含指定的模型
+          if (data.data && Array.isArray(data.data)) {
+            const hasModel = data.data.some((model: any) => 
+              model.id === config.model || model.model === config.model
+            )
+            
+            if (hasModel) {
+              return {
+                success: true,
+                message: `连接成功，模型 ${config.model} 可用`
+              }
+            } else {
+              return {
+                success: false,
+                message: `连接成功，但模型 ${config.model} 不可用`
+              }
+            }
+          }
+
+          return {
+            success: true,
+            message: '连接成功'
+          }
+        }
+      } catch (modelsError) {
+        console.log('/models 请求失败，尝试 /chat/completions 验证:', modelsError)
+      }
+
+      // 如果 /models 失败，尝试 /chat/completions 请求
+      const chatResponse = await fetch(`${config.baseURL}/chat/completions`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${config.apiKey}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            {
+              role: 'user',
+              content: 'test'
+            }
+          ],
+          max_tokens: 1
+        }),
         signal: AbortSignal.timeout(10000) // 10秒超时
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      
-      // 检查是否包含指定的模型
-      if (data.data && Array.isArray(data.data)) {
-        const hasModel = data.data.some((model: any) => 
-          model.id === config.model || model.model === config.model
-        )
-        
-        if (hasModel) {
-          return {
-            success: true,
-            message: `连接成功，模型 ${config.model} 可用`
-          }
-        } else {
-          return {
-            success: false,
-            message: `连接成功，但模型 ${config.model} 不可用`
-          }
+      if (chatResponse.ok) {
+        return {
+          success: true,
+          message: `连接成功，模型 ${config.model} 可用`
         }
+      } else if (chatResponse.status === 401) {
+        return {
+          success: false,
+          message: 'API密钥无效，请检查配置'
+        }
+      } else if (chatResponse.status === 404) {
+        return {
+          success: false,
+          message: `模型 ${config.model} 不存在或不可用`
+        }
+      } else {
+        throw new Error(`HTTP ${chatResponse.status}: ${chatResponse.statusText}`)
       }
 
-      return {
-        success: true,
-        message: '连接成功'
-      }
     } catch (error) {
       console.error('测试连接失败:', error)
       
