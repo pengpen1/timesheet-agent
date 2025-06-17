@@ -103,6 +103,9 @@ export interface ModelConfig {
   model: string
   temperature?: number
   maxTokens?: number
+  top_p?: number
+  presence_penalty?: number
+  frequency_penalty?: number
 }
 
 export interface ModelConfigStore {
