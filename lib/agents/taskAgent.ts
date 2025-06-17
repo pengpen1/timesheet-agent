@@ -93,9 +93,34 @@ export class TaskAgent {
       }
 
       const data = await response.json()
-      const aiResponse = data.choices?.[0]?.message?.content
+      // 多格式兼容
+      let aiResponse = '';
+      // 1. OpenAI Chat Completions 格式
+      if (data.choices?.[0]?.message?.content) {
+        aiResponse = data.choices[0].message.content;
+      }
+      // 2. Gemini (Google) 格式
+      else if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        aiResponse = data.candidates[0].content.parts[0].text;
+      }
+      // 3. 百度文心一言 result 字段
+      else if (typeof data.result === 'string') {
+        aiResponse = data.result;
+      }
+      // 4. 通义千问 output.text
+      else if (typeof data.output?.text === 'string') {
+        aiResponse = data.output.text;
+      }
+      // 5. 百川/讯飞/Minimax 等 output[0].content[0].text
+      else if (Array.isArray(data.output) && data.output[0]?.content?.[0]?.text) {
+        aiResponse = data.output[0].content[0].text;
+      }
+      // 6. /v1/responses 格式
+      else if (Array.isArray(data.output) && data.output[0]?.text) {
+        aiResponse = data.output[0].text;
+      }
 
-      if (aiResponse) {
+      if (aiResponse && typeof aiResponse === 'string' && aiResponse.trim()) {
         return this.parseAIResponse(result, aiResponse)
       } else {
         throw new Error('AI返回格式错误')
