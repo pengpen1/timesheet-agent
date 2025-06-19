@@ -258,7 +258,7 @@ export default function TimesheetAgentPage() {
               />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent pb-1">
-              TimesheetAgent <small className="text-2xl text-gray-500 font-normal">v1.1.0</small>
+              TimesheetAgent <small className="text-lg text-gray-500 font-normal">v1.2.0</small>
             </h1>
           </div>
           <p className="text-lg text-muted-foreground mb-6">

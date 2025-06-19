@@ -6,6 +6,12 @@ export interface Task {
   totalHours: number
   priority: 'high' | 'medium' | 'low'
   description?: string
+  source?: TaskSource
+  sourceData?: {
+    gitCommits?: GitLogEntry[]
+    attachmentId?: string
+    rawContent?: string
+  }
 }
 
 export interface WorkDay {
@@ -128,3 +134,36 @@ export interface ModelConfigStore {
     timestamp: string
   }
 }
+
+// Git配置类型
+export interface GitConfig {
+  repoUrl: string
+  username: string
+  branch?: string
+  privateKey?: string
+  accessToken?: string
+}
+
+// Git日志条目
+export interface GitLogEntry {
+  hash: string
+  date: string
+  author: string
+  message: string
+  files: string[]
+  additions: number
+  deletions: number
+}
+
+// 附件类型
+export interface Attachment {
+  id: string
+  name: string
+  type: 'text' | 'image' | 'excel' | 'word' | 'pdf' | 'other'
+  size: number
+  content?: string // 文本内容或base64编码
+  uploadedAt: string
+}
+
+// 任务来源类型
+export type TaskSource = 'manual' | 'gitlog' | 'attachment'
