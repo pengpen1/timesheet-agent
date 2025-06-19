@@ -99,7 +99,7 @@ export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
               <Plus className="h-4 w-4" />
               添加新任务
             </Button>
-            <div className="space-y-3">
+            <div className="max-h-screen-42 overflow-y-auto space-y-3 pr-2">
               {currentConfig.tasks.map((task, index) => (
                 <Card key={task.id} className="p-4">
                   <div className="space-y-3">

@@ -94,6 +94,10 @@ export default {
           to: { height: "0" },
         },
       },
+      maxHeight: {
+        'screen-1/2': '50vh', // 自定义 max-h-screen-1/2
+        'screen-42': '42vh', // 自定义 max-h-screen-1/3
+      },
     },
   },
   plugins: [],
