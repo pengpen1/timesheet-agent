@@ -1,15 +1,21 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Badge } from "./ui/badge";
-import { 
-  GitBranch, 
-  Download, 
-  Settings, 
-  Clipboard, 
-  FileText, 
+import type { Task, GitConfig, GitLogEntry } from "@/types/types";
+import {
+  GitBranch,
+  Download,
+  Settings,
+  Clipboard,
+  FileText,
   RefreshCw,
   Calendar,
   User,
@@ -17,9 +23,9 @@ import {
   Check,
   X,
   Eye,
-  EyeOff
+  EyeOff,
 } from "lucide-react";
-import type { Task, GitConfig, GitLogEntry } from "@/types/types";
+import React, { useState } from "react";
 
 interface GitLogModuleProps {
   tasks: Task[];
@@ -45,49 +51,70 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   // 解析Git日志文本
   const parseGitLog = (logText: string): GitLogEntry[] => {
     if (!logText.trim()) return [];
-    
+
     try {
       // 支持多种Git日志格式解析
-      const lines = logText.split('\n').filter(line => line.trim());
+      const lines = logText.split("\n").filter((line) => line.trim());
       const logs: GitLogEntry[] = [];
       let currentLog: Partial<GitLogEntry> = {};
-      
+
       for (const line of lines) {
+        // 匹配oneline格式: "<hash> <message>"
+        // 例如: "3e9c4e8 fix: 修复窄距代码块未自适应bug #3633"
+        const onelineMatch = line.match(/^([a-f0-9]{7,40})\s+(.+)$/);
+        if (onelineMatch) {
+          logs.push({
+            hash: onelineMatch[1],
+            message: onelineMatch[2],
+            author: "未知", // oneline格式不包含作者信息
+            date: new Date().toISOString(), // oneline格式不包含日期
+            files: [],
+            additions: 0,
+            deletions: 0,
+          });
+          continue;
+        }
+
         // 匹配commit hash
-        if (line.startsWith('commit ') || line.match(/^[a-f0-9]{7,40}$/)) {
+        if (line.startsWith("commit ") || line.match(/^[a-f0-9]{7,40}$/)) {
           if (currentLog.hash) {
             logs.push(currentLog as GitLogEntry);
           }
           currentLog = {
-            hash: line.replace('commit ', '').trim(),
+            hash: line.replace("commit ", "").trim(),
             files: [],
             additions: 0,
             deletions: 0,
           };
         }
         // 匹配作者
-        else if (line.startsWith('Author:')) {
-          currentLog.author = line.replace('Author:', '').trim();
+        else if (line.startsWith("Author:")) {
+          currentLog.author = line.replace("Author:", "").trim();
         }
         // 匹配日期
-        else if (line.startsWith('Date:')) {
-          currentLog.date = line.replace('Date:', '').trim();
+        else if (line.startsWith("Date:")) {
+          currentLog.date = line.replace("Date:", "").trim();
         }
         // 匹配提交信息
-        else if (line.trim() && !line.startsWith(' ') && currentLog.hash && !currentLog.message) {
+        else if (
+          line.trim() &&
+          !line.startsWith(" ") &&
+          currentLog.hash &&
+          !currentLog.message
+        ) {
           currentLog.message = line.trim();
         }
         // 简单的提交信息格式（一行格式）
-        else if (line.includes('|') && line.includes(' - ')) {
-          const parts = line.split(' - ');
+        else if (line.includes("|") && line.includes(" - ")) {
+          const parts = line.split(" - ");
           if (parts.length >= 2) {
             const [dateAuthor, message] = parts;
-            const [date, author] = dateAuthor.split(' | ');
+            const [date, author] = dateAuthor.split(" | ");
             currentLog = {
               hash: Math.random().toString(36).substr(2, 9),
               date: date?.trim() || new Date().toISOString(),
-              author: author?.trim() || '未知',
-              message: message?.trim() || '',
+              author: author?.trim() || "未知",
+              message: message?.trim() || "",
               files: [],
               additions: 0,
               deletions: 0,
@@ -97,14 +124,14 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           }
         }
       }
-      
+
       if (currentLog.hash) {
         logs.push(currentLog as GitLogEntry);
       }
-      
+
       return logs;
     } catch (error) {
-      console.error('解析Git日志失败:', error);
+      console.error("解析Git日志失败:", error);
       return [];
     }
   };
@@ -112,16 +139,16 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   // 格式化Git日志文本
   const formatGitLog = () => {
     if (!gitLogText.trim()) return;
-    
+
     try {
       const formatted = gitLogText
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line)
-        .join('\n');
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line)
+        .join("\n");
       setGitLogText(formatted);
     } catch (error) {
-      console.error('格式化失败:', error);
+      console.error("格式化失败:", error);
     }
   };
 
@@ -129,9 +156,9 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   const handleProcessGitLog = () => {
     const logs = parseGitLog(gitLogText);
     setParsedLogs(logs);
-    
+
     if (logs.length === 0) {
-      alert('未能解析到有效的Git日志，请检查格式');
+      alert("未能解析到有效的Git日志，请检查格式");
       return;
     }
 
@@ -154,7 +181,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   // 自动爬取Git日志
   const handleAutoFetch = async () => {
     if (!gitConfig.repoUrl || !gitConfig.username) {
-      alert('请先配置Git仓库信息');
+      alert("请先配置Git仓库信息");
       setIsConfigOpen(true);
       return;
     }
@@ -162,28 +189,28 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
     setIsLoading(true);
     try {
       // 调用API爬取Git日志
-      const response = await fetch('/api/git/fetch-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/git/fetch-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(gitConfig),
       });
 
       if (!response.ok) {
-        throw new Error('爬取失败');
+        throw new Error("爬取失败");
       }
 
       const { logs } = await response.json();
       setGitLogText(logs);
       setParsedLogs(parseGitLog(logs));
     } catch (error) {
-      console.error('自动爬取失败:', error);
-      alert('自动爬取失败，请检查配置或手动粘贴日志');
+      console.error("自动爬取失败:", error);
+      alert("自动爬取失败，请检查配置或手动粘贴日志");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const gitLogTaskCount = tasks.filter(t => t.source === 'gitlog').length;
+  const gitLogTaskCount = tasks.filter((t) => t.source === "gitlog").length;
 
   return (
     <Card>
@@ -193,7 +220,8 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           Git日志
         </CardTitle>
         <CardDescription>
-          从Git提交记录中自动生成任务
+          如您不想使用令牌或者自动化爬取，也可以手动复制日志：git log
+          --author="用户名" --since="30 days ago" --oneline
           {gitLogTaskCount > 0 && (
             <Badge variant="secondary" className="ml-2">
               已添加 {gitLogTaskCount} 个参考
@@ -251,7 +279,9 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
               <Label className="font-medium">Git仓库配置</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">仓库地址</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    仓库地址
+                  </Label>
                   <Input
                     value={gitConfig.repoUrl}
                     onChange={(e) =>
@@ -261,7 +291,9 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">用户名</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    用户名
+                  </Label>
                   <Input
                     value={gitConfig.username}
                     onChange={(e) =>
@@ -283,13 +315,18 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">访问令牌</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    访问令牌
+                  </Label>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
                       value={gitConfig.accessToken}
                       onChange={(e) =>
-                        setGitConfig({ ...gitConfig, accessToken: e.target.value })
+                        setGitConfig({
+                          ...gitConfig,
+                          accessToken: e.target.value,
+                        })
                       }
                       placeholder="GitHub Personal Access Token"
                     />
@@ -300,7 +337,11 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
                       className="absolute right-0 top-0 h-full px-3"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -328,7 +369,10 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
             </Label>
             <div className="max-h-40 overflow-y-auto border rounded-md p-2 bg-gray-50">
               {parsedLogs.slice(0, 5).map((log, index) => (
-                <div key={index} className="text-xs py-1 border-b last:border-b-0">
+                <div
+                  key={index}
+                  className="text-xs py-1 border-b last:border-b-0"
+                >
                   <div className="flex items-center gap-2">
                     <Hash className="h-3 w-3" />
                     <code className="bg-gray-200 px-1 rounded">
@@ -366,13 +410,11 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <div className="flex items-center gap-2 text-green-700">
               <Check className="h-4 w-4" />
-              <span className="font-medium">
-                已添加Git日志参考内容
-              </span>
+              <span className="font-medium">已添加Git日志参考内容</span>
             </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
-}; 
+};

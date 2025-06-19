@@ -84,7 +84,7 @@ export class TaskAgent {
       // 构建提示词
       const prompt = this.buildPrompt(result, originalTasks)
       // 构建 system prompt
-      let systemPrompt = '你是一个专业的工时管理助手，擅长生成简洁、专业的工作内容描述。请根据任务信息生成符合企业工时表标准的工作描述。';
+      let systemPrompt = '你是一个专业的工时管理助手，擅长生成简洁、专业的工作内容描述。请根据任务信息生成符合企业工时表标准的工作描述。\n\n特别注意：\n1. 如果任务包含Git提交记录，请参考具体的提交信息生成更准确的工作描述\n2. 如果任务包含附件内容，请结合附件信息优化描述的专业性\n3. 对于图片附件，请根据文件名和上下文推测工作内容\n4. 参考信息任务(0小时)不应出现在最终工时分配中\n5. 生成的描述要体现实际技术工作内容';
       if (modelConfig.rules && modelConfig.rules.trim()) {
         systemPrompt = systemPrompt + '\n' + modelConfig.rules.trim();
       }
@@ -174,13 +174,79 @@ export class TaskAgent {
    * 构建AI提示词
    */
   private static buildPrompt(result: TaskAgentOutput, originalTasks: Task[]): string {
-    const taskSummary = originalTasks.map(task => 
-      `- ${task.name} (${task.totalHours}h, 优先级: ${task.priority}${task.description ? ', 描述: ' + task.description : ''})`
-    ).join('\n')
+    // 构建增强的任务信息，包含源数据详情
+    const taskSummary = originalTasks.map(task => {
+      let taskInfo = `- ${task.name} (${task.totalHours}h, 优先级: ${task.priority}`;
+      
+      if (task.description) {
+        taskInfo += `, 描述: ${task.description}`;
+      }
+      
+      // 根据任务来源添加详细信息
+      if (task.source && task.sourceData) {
+        switch (task.source) {
+          case 'gitlog':
+            if (task.sourceData.gitCommits && task.sourceData.gitCommits.length > 0) {
+              taskInfo += `\n  Git提交详情:`;
+              task.sourceData.gitCommits.forEach(commit => {
+                taskInfo += `\n    - ${commit.hash.substring(0, 7)}: ${commit.message} (${commit.author}, ${new Date(commit.date).toLocaleDateString()})`;
+              });
+            } else if (task.sourceData.rawContent) {
+              taskInfo += `\n  Git日志内容:\n${task.sourceData.rawContent.split('\n').map(line => `    ${line}`).join('\n')}`;
+            }
+            break;
+            
+          case 'attachment':
+            if (task.sourceData.rawContent) {
+              // 检查是否是图片类型
+              const isImage = task.sourceData.rawContent.startsWith('data:image/') || 
+                            task.sourceData.fileType === 'image' ||
+                            /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(task.name);
+              
+              if (isImage) {
+                taskInfo += `\n  附件信息: 图片文件 - ${task.name}`;
+                taskInfo += `\n  注意: 图片内容无法直接读取，请根据文件名和上下文推测工作内容`;
+              } else {
+                // 文本类型附件，包含详细内容
+                const content = task.sourceData.rawContent;
+                if (content.length > 500) {
+                  taskInfo += `\n  附件内容摘要:\n${content.substring(0, 500).split('\n').map(line => `    ${line}`).join('\n')}...`;
+                } else {
+                  taskInfo += `\n  附件内容:\n${content.split('\n').map(line => `    ${line}`).join('\n')}`;
+                }
+              }
+            }
+            break;
+            
+          case 'manual':
+          default:
+            // 手动任务不需要额外信息
+            break;
+        }
+      }
+      
+      taskInfo += ')';
+      return taskInfo;
+    }).join('\n\n');
 
     const assignmentSummary = result.dailyAssignments.map(day => 
       `${day.date}: ${day.tasks.map(t => `${t.taskName}(${t.allocatedHours}h)`).join(', ')}`
     ).join('\n')
+
+    // 检查是否有参考信息
+    const hasGitReference = originalTasks.some(task => task.source === 'gitlog');
+    const hasAttachmentReference = originalTasks.some(task => task.source === 'attachment');
+    
+    let additionalInstructions = '';
+    if (hasGitReference || hasAttachmentReference) {
+      additionalInstructions += '\n\n参考信息使用说明：';
+      if (hasGitReference) {
+        additionalInstructions += '\n- 包含Git提交记录，请参考提交信息生成更准确的工作描述';
+      }
+      if (hasAttachmentReference) {
+        additionalInstructions += '\n- 包含附件内容，请结合附件信息优化工作描述的专业性和准确性';
+      }
+    }
 
     return `
 任务列表:
@@ -194,6 +260,8 @@ ${assignmentSummary}
 2. 体现实际工作内容
 3. 符合软件开发工时表标准
 4. 每个描述不超过30字
+5. 充分利用提供的Git提交记录和附件信息
+6. 参考信息会统一处理成0小时任务，${additionalInstructions}
 
 请按以下JSON格式返回：
 {

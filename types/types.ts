@@ -11,6 +11,8 @@ export interface Task {
     gitCommits?: GitLogEntry[]
     attachmentId?: string
     rawContent?: string
+    fileName?: string
+    fileType?: string
   }
 }
 
@@ -64,6 +66,11 @@ export interface TimesheetResult {
     averageHoursPerDay: number
   }
   generatedAt: string
+  // 归档相关字段
+  id?: string
+  name?: string
+  projectConfig?: ProjectConfig
+  archivedAt?: string
 }
 
 export interface StorageData {

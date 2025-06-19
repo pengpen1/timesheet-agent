@@ -33,23 +33,26 @@ import {
   Save,
   Edit3,
   Table,
-  Loader2
+  Loader2,
+  History
 } from "lucide-react";
 import { useTimesheetStore } from "@/store/store";
 import { TaskAgent } from "@/lib/agents/taskAgent";
 import { TimesheetAgent } from "@/lib/agents/timesheetAgent";
 import { ExportService } from "@/lib/export";
 import { generateWorkDays } from "@/lib/utils";
-import { TimesheetEntry } from "@/types/types";
+import { TimesheetEntry, TimesheetResult } from "@/types/types";
 import { TaskConfigPanel } from "@/components/TaskConfigPanel";
 import { TimesheetResultPanel } from "@/components/TimesheetResultPanel";
 import { ModelConfigPanel } from "@/components/ModelConfigPanel";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import Image from "next/image";
 
 export default function TimesheetAgentPage() {
   const {
     currentConfig,
     currentResult,
+    savedResults,
     isGenerating,
     errors,
     warnings,
@@ -62,9 +65,11 @@ export default function TimesheetAgentPage() {
     exportAsText,
     exportAsCSV,
     updateTimesheetEntry,
+    saveResult,
+    deleteResult,
   } = useTimesheetStore();
 
-  const [activeTab, setActiveTab] = useState<"config" | "result" | "model">("config");
+  const [activeTab, setActiveTab] = useState<"config" | "result" | "model" | "history">("config");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -227,6 +232,34 @@ export default function TimesheetAgentPage() {
     showNotification("success", "已更新");
   };
 
+  // 归档工时表
+  const handleArchive = (name: string) => {
+    if (!currentResult) return;
+    try {
+      saveResult(name);
+      showNotification("success", "工时表已归档保存");
+    } catch (error) {
+      showNotification("error", "归档失败");
+    }
+  };
+
+  // 查看历史记录
+  const handleViewHistoryResult = (result: TimesheetResult) => {
+    setCurrentResult(result);
+    setActiveTab("result");
+    showNotification("success", "已加载历史记录");
+  };
+
+  // 导出历史记录
+  const handleExportHistoryResult = (result: TimesheetResult) => {
+    try {
+      ExportService.exportToExcel(result.entries);
+      showNotification("success", "历史记录已导出");
+    } catch (error) {
+      showNotification("error", "导出失败");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* 通知 */}
@@ -282,7 +315,7 @@ export default function TimesheetAgentPage() {
 
         {/* 主要内容 */}
         <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="config" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               任务配置
@@ -290,6 +323,10 @@ export default function TimesheetAgentPage() {
             <TabsTrigger value="result" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               工时表结果
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              历史记录
             </TabsTrigger>
             <TabsTrigger value="model" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -322,13 +359,25 @@ export default function TimesheetAgentPage() {
               handleExportCSV={handleExportCSV}
               handleExportText={handleExportText}
               handleCopyTimesheet={handleCopyTimesheet}
-              setActiveTab={(tab) => setActiveTab(tab as "config" | "result" | "model")}
+              handleArchive={handleArchive}
+              setActiveTab={(tab) => setActiveTab(tab as "config" | "result" | "model" | "history")}
+              showNotification={showNotification}
             />
           </TabsContent>
 
           {/* 模型配置页面 */}
           <TabsContent value="model">
             <ModelConfigPanel />
+          </TabsContent>
+
+          {/* 历史记录页面 */}
+          <TabsContent value="history">
+            <HistoryPanel
+              savedResults={savedResults}
+              onViewResult={handleViewHistoryResult}
+              onDeleteResult={deleteResult}
+              onExportResult={handleExportHistoryResult}
+            />
           </TabsContent>
         </Tabs>
       </div>

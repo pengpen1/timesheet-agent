@@ -1,9 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { FileText, Download, Copy, Table, Clock, Calendar, BarChart3, Sparkles } from "lucide-react";
+import { FileText, Download, Copy, Table, Clock, Calendar, BarChart3, Sparkles, Archive, ListTodo, User, CalendarDays } from "lucide-react";
 import type { TimesheetResult, TimesheetEntry } from "@/types/types";
+import { format } from "date-fns";
+import { zhCN } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 interface TimesheetResultPanelProps {
   currentResult: TimesheetResult | null;
@@ -14,7 +24,9 @@ interface TimesheetResultPanelProps {
   handleExportCSV: () => void;
   handleExportText: () => void;
   handleCopyTimesheet: () => void;
-  setActiveTab: (tab: "config" | "result" | "model") => void;
+  handleArchive?: (name: string) => void;
+  setActiveTab: (tab: "config" | "result" | "model" | "history") => void;
+  showNotification?: (type: "success" | "error", message: string) => void;
 }
 
 export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
@@ -26,8 +38,30 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
   handleExportCSV,
   handleExportText,
   handleCopyTimesheet,
+  handleArchive,
   setActiveTab,
+  showNotification,
 }) => {
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [archiveName, setArchiveName] = useState("");
+
+  // 当打开归档对话框时，设置默认名称
+  const openArchiveDialog = () => {
+    if (currentResult) {
+      const defaultName = `工时表_${format(new Date(), 'yyyy/MM/dd', { locale: zhCN })}`;
+      setArchiveName(defaultName);
+      setIsArchiveDialogOpen(true);
+    }
+  };
+
+  // 处理归档确认
+  const handleArchiveConfirm = () => {
+    if (handleArchive && archiveName.trim()) {
+      handleArchive(archiveName.trim());
+      setIsArchiveDialogOpen(false);
+    }
+  };
+
   if (!currentResult) {
     return (
       <Card>
@@ -44,8 +78,46 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
       </Card>
     );
   }
+
   return (
     <div className="space-y-6">
+      {/* 工时表信息卡片 */}
+      {currentResult.name && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <FileText className="h-5 w-5" />
+              {currentResult.name}
+            </CardTitle>
+            <CardDescription>
+              <div className="flex flex-wrap gap-4 mt-2">
+                {currentResult.projectConfig && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <ListTodo className="h-4 w-4" />
+                      <span>任务数：{currentResult.projectConfig.tasks.length}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      <span>
+                        {format(new Date(currentResult.projectConfig.dateRange.startDate), 'MM/dd')} - 
+                        {format(new Date(currentResult.projectConfig.dateRange.endDate), 'MM/dd')}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {currentResult.archivedAt && (
+                  <div className="flex items-center gap-2">
+                    <Archive className="h-4 w-4" />
+                    <span>归档于：{format(new Date(currentResult.archivedAt), 'yyyy/MM/dd HH:mm')}</span>
+                  </div>
+                )}
+              </div>
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {/* 统计信息 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -82,6 +154,7 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
           </CardContent>
         </Card>
       </div>
+
       {/* 导出操作 */}
       <Card>
         <CardHeader>
@@ -107,13 +180,24 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
           </div>
         </CardContent>
       </Card>
+
       {/* 工时表 */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Table className="h-5 w-5" />工时表详情
-          </CardTitle>
-          <CardDescription>点击单元格可以编辑内容</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Table className="h-5 w-5" />工时表详情
+              </CardTitle>
+              <CardDescription>点击单元格可以编辑内容</CardDescription>
+            </div>
+            {handleArchive && !currentResult.archivedAt && (
+              <Button onClick={openArchiveDialog} size="sm" className="flex items-center gap-2">
+                <Archive className="h-4 w-4" />
+                归档保存
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -124,6 +208,7 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
                   <th className="text-left p-3 font-medium">工作内容</th>
                   <th className="text-left p-3 font-medium">消耗工时</th>
                   <th className="text-left p-3 font-medium">剩余工时</th>
+                  <th className="text-left p-3 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,8 +228,8 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
                         />
                       ) : (
                         <div
-                          onClick={() => setEditingEntryId(entry.id)}
-                          className="cursor-pointer hover:bg-accent rounded p-1 min-h-[24px]"
+                          onClick={() => !currentResult.archivedAt && setEditingEntryId(entry.id)}
+                          className={`${!currentResult.archivedAt ? 'cursor-pointer hover:bg-accent' : ''} rounded p-1 min-h-[24px]`}
                         >
                           {entry.workContent}
                         </div>
@@ -152,6 +237,19 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
                     </td>
                     <td className="p-3">{entry.hoursSpent}h</td>
                     <td className="p-3">{entry.remainingHours}h</td>
+                    <td className="p-3">
+                      <Button
+                        onClick={() => {
+                          navigator.clipboard.writeText(entry.workContent);
+                          showNotification?.("success", "工作内容已复制到剪贴板");
+                        }}
+                        variant="ghost"
+                        size="icon"
+                        title="复制工作内容"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -159,6 +257,63 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* 归档确认对话框 */}
+      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>归档工时表</DialogTitle>
+            <DialogDescription>
+              请确认以下信息并设置归档名称
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* 不可编辑的信息 */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm">工时表信息</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-muted-foreground">总工时</div>
+                <div>{currentResult.summary.totalHours}h</div>
+                <div className="text-muted-foreground">工作天数</div>
+                <div>{currentResult.summary.totalDays}天</div>
+                <div className="text-muted-foreground">日均工时</div>
+                <div>{currentResult.summary.averageHoursPerDay.toFixed(1)}h</div>
+                {currentResult.projectConfig && (
+                  <>
+                    <div className="text-muted-foreground">任务数量</div>
+                    <div>{currentResult.projectConfig.tasks.length}个</div>
+                    <div className="text-muted-foreground">时间范围</div>
+                    <div>
+                      {format(new Date(currentResult.projectConfig.dateRange.startDate), 'MM/dd')} - 
+                      {format(new Date(currentResult.projectConfig.dateRange.endDate), 'MM/dd')}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* 可编辑的归档名称 */}
+            <div className="space-y-2">
+              <label htmlFor="archiveName" className="text-sm font-medium">
+                归档名称
+              </label>
+              <Input
+                id="archiveName"
+                value={archiveName}
+                onChange={(e) => setArchiveName(e.target.value)}
+                placeholder="请输入归档名称"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleArchiveConfirm} disabled={!archiveName.trim()}>
+              确认归档
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }; 

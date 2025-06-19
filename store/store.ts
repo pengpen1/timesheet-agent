@@ -29,7 +29,7 @@ interface TimesheetStore {
   deleteConfig: (index: number) => void
   
   setCurrentResult: (result: TimesheetResult) => void
-  saveResult: () => void
+  saveResult: (name?: string) => void
   deleteResult: (index: number) => void
   updateTimesheetEntry: (entryId: string, updates: Partial<TimesheetEntry>) => void
   
@@ -120,11 +120,18 @@ export const useTimesheetStore = create<TimesheetStore>()(
         }
       },
 
-      saveResult: () => {
-        const { currentResult, savedResults } = get()
+      saveResult: (name?: string) => {
+        const { currentResult, savedResults, currentConfig } = get()
         if (currentResult) {
+          const archivedResult: TimesheetResult = {
+            ...currentResult,
+            id: Date.now().toString(),
+            name: name || `工时表_${new Date().toLocaleDateString()}`,
+            projectConfig: { ...currentConfig },
+            archivedAt: new Date().toISOString()
+          }
           set({
-            savedResults: [...savedResults, currentResult]
+            savedResults: [...savedResults, archivedResult]
           })
         }
       },
