@@ -523,11 +523,22 @@ ${assignmentSummary}
 - 按优先级分配(priority)：优先安排高优先级任务，确保重要工作优先完成
 - 按功能分配(feature)：将相关功能的任务集中安排，提高工作连贯性和效率
 
+🔧 Git日志分析指导：
+当任务包含Git提交记录时，请充分利用这些信息优化工时分配：
+1. **提交密度分析**：提交密度高(>2次/天)的任务通常需要更多时间和更细致的安排
+2. **工作节奏参考**：根据历史提交的日期分布，模拟相似的工作节奏
+3. **复杂度评估**：复杂的提交信息(长消息、多文件)暗示更高的开发难度
+4. **时间分配优化**：将复杂任务安排在工作效率较高的时段
+
+📄 附件内容分析：
+当任务包含附件时，根据内容复杂度和类型调整工时安排
+
 输出要求：
 1. 每天的总工时不应超过对应工作日的plannedHours
 2. 所有任务的总工时应该被合理分配完毕
 3. 分配结果要符合人类工作习惯，避免频繁切换任务
-4. 严格按照指定的JSON格式输出`;
+4. 充分利用Git提交记录等参考信息，让工时分配更贴近实际开发情况
+5. 严格按照指定的JSON格式输出`;
       
       if (modelConfig.rules && modelConfig.rules.trim()) {
         systemPrompt = systemPrompt + '\n\n用户自定义规则：\n' + modelConfig.rules.trim();
@@ -609,9 +620,75 @@ ${assignmentSummary}
    * 构建AI分配提示词
    */
   private static buildDistributionPrompt(tasks: Task[], workDays: WorkDay[], distributionMode: string): string {
-    const taskSummary = tasks.map(task => 
-      `- ${task.name} (${task.totalHours}h, 优先级: ${task.priority}${task.description ? ', 描述: ' + task.description : ''})`
-    ).join('\n')
+    // 构建增强的任务信息，包含Git日志和附件详情
+    const taskSummary = tasks.map(task => {
+      let taskInfo = `- ${task.name} (${task.totalHours}h, 优先级: ${task.priority}`;
+      
+      if (task.description) {
+        taskInfo += `, 描述: ${task.description}`;
+      }
+      
+      // 根据任务来源添加详细信息用于工时分配参考
+      if (task.source && task.sourceData) {
+        switch (task.source) {
+          case 'gitlog':
+            if (task.sourceData.gitCommits && task.sourceData.gitCommits.length > 0) {
+              taskInfo += `\n  📊 Git提交分析:`;
+              const commits = task.sourceData.gitCommits;
+              taskInfo += `\n    - 提交数量: ${commits.length}个`;
+              
+              // 分析提交时间分布
+              const commitDates = commits.map(c => new Date(c.date).toDateString());
+              const uniqueDates = Array.from(new Set(commitDates));
+              taskInfo += `\n    - 工作日分布: ${uniqueDates.length}天`;
+              
+              // 提交密度分析
+              if (uniqueDates.length > 0) {
+                const avgCommitsPerDay = (commits.length / uniqueDates.length).toFixed(1);
+                taskInfo += `\n    - 平均提交密度: ${avgCommitsPerDay}次/天`;
+              }
+              
+              // 详细提交记录
+              taskInfo += `\n  📝 提交详情:`;
+              commits.forEach((commit, index) => {
+                if (index < 3) { // 只显示前3个提交
+                  taskInfo += `\n    - ${commit.hash.substring(0, 7)}: ${commit.message} (${new Date(commit.date).toLocaleDateString()})`;
+                } else if (index === 3) {
+                  taskInfo += `\n    - ... 还有${commits.length - 3}个提交`;
+                }
+              });
+            } else if (task.sourceData.rawContent) {
+              taskInfo += `\n  📝 Git日志参考:\n${task.sourceData.rawContent.split('\n').slice(0, 5).map(line => `    ${line}`).join('\n')}`;
+              if (task.sourceData.rawContent.split('\n').length > 5) {
+                taskInfo += `\n    ...`;
+              }
+            }
+            break;
+            
+          case 'attachment':
+            if (task.sourceData.rawContent) {
+              const isImage = task.sourceData.rawContent.startsWith('data:image/') || 
+                            task.sourceData.fileType === 'image' ||
+                            /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(task.name);
+              
+              if (isImage) {
+                taskInfo += `\n  🖼️ 附件参考: 图片文件 - ${task.name}`;
+              } else {
+                const content = task.sourceData.rawContent;
+                if (content.length > 200) {
+                  taskInfo += `\n  📄 附件参考:\n${content.substring(0, 200).split('\n').map(line => `    ${line}`).join('\n')}...`;
+                } else {
+                  taskInfo += `\n  📄 附件参考:\n${content.split('\n').map(line => `    ${line}`).join('\n')}`;
+                }
+              }
+            }
+            break;
+        }
+      }
+      
+      taskInfo += ')';
+      return taskInfo;
+    }).join('\n\n');
     
     const workDaysSummary = workDays.map(day => 
       `- ${day.date} (${day.plannedHours}h)`
@@ -623,6 +700,21 @@ ${assignmentSummary}
       'feature': '按功能分配：将相关功能的任务集中安排在连续的时间内'
     }[distributionMode] || '按天平均分配'
     
+    // 检查是否有Git日志参考
+    const hasGitReference = tasks.some(task => task.source === 'gitlog');
+    const hasAttachmentReference = tasks.some(task => task.source === 'attachment');
+    
+    let gitAnalysisInstructions = '';
+    if (hasGitReference) {
+      gitAnalysisInstructions = `
+
+🔍 Git日志工时分配建议：
+1. 根据提交密度调整工时分配 - 提交密度高的任务可能需要更多时间
+2. 参考历史工作日分布 - 按照实际开发节奏安排工时
+3. 考虑提交复杂度 - 复杂提交信息暗示需要更长开发时间
+4. 模拟真实开发流程 - 根据Git记录推测开发难度和时间需求`;
+    }
+    
     return `
 任务列表：
 ${taskSummary}
@@ -630,13 +722,15 @@ ${taskSummary}
 工作日列表：
 ${workDaysSummary}
 
-分配策略：${modeDescription}
+分配策略：${modeDescription}${gitAnalysisInstructions}
 
 请根据上述信息，智能分配每日工时。要求：
 1. 每个任务的总工时必须被完全分配
 2. 每天的分配工时不能超过该天的plannedHours
 3. 分配要符合所选策略的特点
 4. 考虑实际工作习惯，避免每天任务过于分散
+5. 充分利用Git提交记录来优化工时分配的合理性
+6. 根据提交密度和复杂度调整任务的工时分布
 
 请按以下JSON格式返回分配结果：
 {

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { 
   Plus, 
   GitBranch, 
@@ -12,7 +13,12 @@ import {
   Loader2, 
   Sparkles,
   Trash2,
-  Users
+  Users,
+  Eye,
+  GitCommit,
+  FileText,
+  User2,
+  Clock
 } from "lucide-react";
 import { NewTaskModule } from "./NewTaskModule";
 import { GitLogModule } from "./GitLogModule";
@@ -38,6 +44,8 @@ export const TaskManagementContainer: React.FC<TaskManagementContainerProps> = (
   handleGenerateTimesheet,
 }) => {
   const [activeTab, setActiveTab] = useState("new-task");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   // 计算工作日统计
   const workDays = generateWorkDays(
@@ -96,6 +104,152 @@ export const TaskManagementContainer: React.FC<TaskManagementContainerProps> = (
   const clearTasksBySource = (source: Task['source']) => {
     const filteredTasks = currentConfig.tasks.filter(task => task.source !== source);
     updateConfig({ tasks: filteredTasks });
+  };
+
+  // 查看任务详情
+  const viewTaskDetail = (task: Task) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
+
+  // 渲染任务详情内容
+  const renderTaskDetail = () => {
+    if (!selectedTask) return null;
+
+    return (
+      <div className="space-y-6">
+        {/* 基本信息 */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-lg">{selectedTask.name}</h4>
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${
+                selectedTask.source === 'manual' ? 'bg-blue-50 text-blue-700' :
+                selectedTask.source === 'gitlog' ? 'bg-green-50 text-green-700' :
+                'bg-purple-50 text-purple-700'
+              }`}
+            >
+              {selectedTask.source === 'manual' ? '手动任务' : 
+               selectedTask.source === 'gitlog' ? 'Git日志任务' : '附件任务'}
+            </Badge>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span>工时: {selectedTask.totalHours} 小时</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant={selectedTask.priority === 'high' ? 'destructive' : 
+                        selectedTask.priority === 'medium' ? 'default' : 'secondary'}
+                className="text-xs"
+              >
+                优先级: {selectedTask.priority === 'high' ? '高' : 
+                         selectedTask.priority === 'medium' ? '中' : '低'}
+              </Badge>
+            </div>
+          </div>
+
+          {selectedTask.description && (
+            <div className="bg-gray-50 p-3 rounded-md">
+              <p className="text-sm text-gray-700">{selectedTask.description}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Git日志详情 */}
+        {selectedTask.source === 'gitlog' && selectedTask.sourceData && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <GitCommit className="h-4 w-4 text-green-600" />
+              <h5 className="font-medium text-green-800">Git提交记录</h5>
+            </div>
+            
+            {selectedTask.sourceData.gitCommits && selectedTask.sourceData.gitCommits.length > 0 ? (
+              <div className="space-y-3">
+                <div className="bg-green-50 p-3 rounded-md text-sm">
+                  <div className="grid grid-cols-2 gap-4 text-green-700">
+                    <span>提交数量: {selectedTask.sourceData.gitCommits.length}个</span>
+                    <span>工作日分布: {Array.from(new Set(selectedTask.sourceData.gitCommits.map(c => new Date(c.date).toDateString()))).length}天</span>
+                  </div>
+                </div>
+                
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {selectedTask.sourceData.gitCommits.map((commit, index) => (
+                    <div key={index} className="bg-white border border-green-200 p-3 rounded-md">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-green-100 p-1 rounded">
+                          <GitCommit className="h-3 w-3 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span className="font-mono">{commit.hash.substring(0, 7)}</span>
+                            <span>{new Date(commit.date).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <User2 className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">{commit.author}</span>
+                          </div>
+                          <p className="text-sm text-gray-800 break-words">{commit.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : selectedTask.sourceData.rawContent ? (
+              <div className="bg-green-50 p-3 rounded-md">
+                <pre className="text-xs text-green-800 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {selectedTask.sourceData.rawContent}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">无Git日志内容</p>
+            )}
+          </div>
+        )}
+
+        {/* 附件详情 */}
+        {selectedTask.source === 'attachment' && selectedTask.sourceData && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-600" />
+              <h5 className="font-medium text-purple-800">附件内容</h5>
+            </div>
+            
+            {selectedTask.sourceData.rawContent ? (
+              <div className="bg-purple-50 p-3 rounded-md">
+                {selectedTask.sourceData.rawContent.startsWith('data:image/') ? (
+                  <div className="text-center space-y-2">
+                    <img 
+                      src={selectedTask.sourceData.rawContent} 
+                      alt="附件图片" 
+                      className="max-w-full max-h-40 mx-auto rounded border"
+                    />
+                    <p className="text-xs text-purple-600">图片附件</p>
+                  </div>
+                ) : (
+                  <pre className="text-xs text-purple-800 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    {selectedTask.sourceData.rawContent}
+                  </pre>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">无附件内容</p>
+            )}
+          </div>
+        )}
+
+        {/* 手动任务说明 */}
+        {selectedTask.source === 'manual' && (
+          <div className="bg-blue-50 p-3 rounded-md">
+            <p className="text-sm text-blue-700">这是手动创建的任务，AI将根据任务名称和描述生成工时内容。</p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -273,7 +427,7 @@ export const TaskManagementContainer: React.FC<TaskManagementContainerProps> = (
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              全部任务列表 ({currentConfig.tasks.length})
+              全部任务列表 s({currentConfig.tasks.length})
             </CardTitle>
             <CardDescription>所有来源的任务汇总</CardDescription>
           </CardHeader>
@@ -312,13 +466,24 @@ export const TaskManagementContainer: React.FC<TaskManagementContainerProps> = (
                         )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteTask(task.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => viewTaskDetail(task)}
+                        title="查看详情"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteTask(task.id)}
+                        title="删除任务"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -365,6 +530,24 @@ export const TaskManagementContainer: React.FC<TaskManagementContainerProps> = (
           </div>
         </CardContent>
       </Card>
+
+             {/* 任务详情对话框 */}
+       <Dialog open={showTaskDetail} onOpenChange={setShowTaskDetail}>
+         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle>任务详情</DialogTitle>
+             <DialogDescription>查看任务的详细信息和AI参考内容</DialogDescription>
+           </DialogHeader>
+           <div className="grid gap-4 py-4">
+             {renderTaskDetail()}
+           </div>
+           <DialogFooter>
+             <Button onClick={() => setShowTaskDetail(false)}>
+               关闭
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
     </div>
   );
 }; 
