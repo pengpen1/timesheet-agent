@@ -1,0 +1,274 @@
+# TimesheetAgent 项目开发规则
+
+## 项目概述
+TimesheetAgent 是一个基于Next.js的智能工时填报器，使用双Agent架构（TaskAgent + TimesheetAgent）自动生成标准化工时表。
+
+## 架构说明
+
+### 整体架构
+```
+TimesheetAgent/
+├── app/                    # Next.js App Router
+│   ├── api/               # API路由
+│   │   └── git/          # Git相关API
+│   ├── layout.tsx        # 全局布局
+│   └── page.tsx          # 主页面
+├── components/            # React组件
+│   ├── ui/               # 基础UI组件（shadcn/ui）
+│   ├── *Module.tsx       # 功能模块组件
+│   └── *Panel.tsx        # 面板组件
+├── lib/                   # 核心业务逻辑
+│   ├── agents/           # AI Agent实现
+│   ├── export.ts         # 导出服务
+│   ├── model-config.ts   # 模型配置
+│   └── utils.ts          # 工具函数
+├── store/                 # 状态管理
+├── types/                 # TypeScript类型定义
+└── styles/               # 样式文件
+```
+
+### 双Agent架构
+1. **TaskAgent** (`lib/agents/taskAgent.ts`)
+   - 负责任务分析和智能分配
+   - 处理多种任务来源（手动、Git日志、附件）
+   - 根据工作日历进行任务分配
+
+2. **TimesheetAgent** (`lib/agents/timesheetAgent.ts`)
+   - 负责生成最终的工时表
+   - 将任务分配转换为具体的工时记录
+   - 优化工作描述和时间分配
+
+### 工作流程
+
+#### 1. 任务配置阶段
+```
+用户输入 → TaskConfigPanel → 三个模块并行处理
+├── NewTaskModule: 手动添加任务
+├── GitLogModule: Git日志解析
+└── AttachmentModule: 文件内容提取
+                ↓
+        任务汇总到统一状态管理
+```
+
+#### 2. 智能处理阶段
+```
+任务数据 → TaskAgent → 分析任务优先级和工作量
+                  ↓
+              生成每日任务分配
+                  ↓
+TimesheetAgent → 生成工时表条目 → TimesheetResultPanel
+```
+
+#### 3. 结果管理阶段
+```
+工时表结果 → 编辑/导出/归档
+           ↓
+     历史记录管理 → HistoryPanel
+```
+
+## 组件规范
+
+### UI组件使用规范
+
+#### ✅ 必须使用的统一组件
+
+1. **提示和通知**
+   ```typescript
+   // 使用 toast（来自sonner）
+   import { toast } from "sonner";
+   
+   toast.success("操作成功");
+   toast.error("操作失败");
+   toast.warning("警告信息");
+   toast.info("提示信息");
+   ```
+
+2. **确认对话框**
+   ```typescript
+   // 使用 ConfirmDialog 组件
+   import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+   
+   <ConfirmDialog
+     open={showDialog}
+     onOpenChange={setShowDialog}
+     title="确认删除"
+     description="此操作无法撤销"
+     onConfirm={handleDelete}
+     variant="destructive" // 可选：default | destructive
+   />
+   ```
+
+3. **输入对话框**
+   ```typescript
+   // 使用 InputDialog 组件
+   import { InputDialog } from "@/components/ui/input-dialog";
+   
+   <InputDialog
+     open={showInputDialog}
+     onOpenChange={setShowInputDialog}
+     title="输入名称"
+     label="配置名称"
+     defaultValue="默认值"
+     onConfirm={handleSave}
+   />
+   ```
+
+#### ❌ 禁止使用的原生方法
+- `alert()` - 使用 toast 替代
+- `confirm()` - 使用 ConfirmDialog 替代
+- `prompt()` - 使用 InputDialog 替代
+
+### 状态管理规范
+
+#### Zustand Store 使用
+```typescript
+// 使用 useTimesheetStore 进行状态管理
+const {
+  currentConfig,
+  currentResult,
+  updateConfig,
+  addTask,
+  setCurrentResult,
+  viewHistoryResult, // 查看历史记录专用，不触发自动保存
+} = useTimesheetStore();
+```
+
+#### 重要区别
+- `setCurrentResult(result, autoSave)` - 设置当前结果，可控制是否自动保存
+- `viewHistoryResult(result)` - 仅用于查看历史记录，不会触发保存
+
+## Package.json 依赖说明
+
+### 核心框架
+- `next`: Next.js 框架，提供React全栈开发能力
+- `react` / `react-dom`: React核心库
+- `typescript`: TypeScript支持
+
+### UI组件库
+- `@radix-ui/*`: 无障碍UI基础组件库
+  - `react-alert-dialog`: 警告对话框
+  - `react-dialog`: 通用对话框
+  - `react-select`: 选择器组件
+  - `react-tabs`: 标签页组件
+  - `react-toast`: 原生Toast（被sonner替代）
+  - 等其他Radix UI组件
+- `lucide-react`: 现代化图标库
+- `sonner`: 现代化Toast通知组件（替代原生alert）
+
+### 状态管理
+- `zustand`: 轻量级状态管理库，支持持久化
+
+### 样式处理
+- `tailwindcss`: CSS框架
+- `@tailwindcss/forms`: 表单样式增强
+- `class-variance-authority`: 组件变体管理
+- `clsx` / `tailwind-merge`: CSS类名合并工具
+
+### 工具库
+- `date-fns`: 日期处理库
+- `xlsx`: Excel文件处理
+- `file-type`: 文件类型检测
+- `mime-types`: MIME类型处理
+
+### 自动化功能
+- `simple-git`: Git操作库（方案1：API抓取）
+- `playwright`: 浏览器自动化（方案2：DOM抓取）
+- `multer`: 文件上传处理
+
+### 表单和验证
+- `react-hook-form`: 表单管理
+- `zod`: 数据验证
+
+### 其他
+- `framer-motion`: 动画库
+- `@tanstack/react-table`: 表格组件
+- `cmdk`: 命令面板组件
+
+## 开发规范
+
+### 文件命名
+- 组件文件: PascalCase (例: `GitLogModule.tsx`)
+- 工具文件: camelCase (例: `utils.ts`)
+- 类型文件: camelCase (例: `types.ts`)
+
+### 组件结构
+```typescript
+// 1. 导入
+import React from 'react';
+import { toast } from 'sonner';
+import { ComponentProps } from '@/types/types';
+
+// 2. 接口定义
+interface ComponentNameProps {
+  // props定义
+}
+
+// 3. 组件实现
+export const ComponentName: React.FC<ComponentNameProps> = ({
+  // props解构
+}) => {
+  // 4. 状态和钩子
+  
+  // 5. 事件处理函数
+  
+  // 6. 渲染
+  return (
+    // JSX
+  );
+};
+```
+
+### 错误处理
+```typescript
+try {
+  // 操作
+  toast.success("操作成功");
+} catch (error) {
+  console.error("操作失败:", error);
+  toast.error("操作失败，请重试");
+}
+```
+
+### Git提交规范
+- `feat: 新功能`
+- `fix: 修复问题`
+- `docs: 文档更新`
+- `style: 样式调整`
+- `refactor: 重构代码`
+- `test: 测试相关`
+- `chore: 构建/工具相关`
+
+## 部署注意事项
+
+### 环境兼容性
+- Vercel: 支持所有功能，但DOM抓取不可用
+- Railway: 支持所有功能，包括DOM抓取
+- Docker: 需要安装playwright浏览器
+
+### 环境变量
+- `DISABLE_BROWSER_AUTOMATION=true`: 禁用DOM抓取功能
+
+## 特殊功能说明
+
+### Git日志抓取
+1. **方案1 (API)**：使用simple-git + GitHub Token
+2. **方案2 (DOM)**：使用playwright浏览器自动化
+
+### 多模态任务来源
+1. **手动输入**：用户直接添加任务
+2. **Git日志**：从提交记录生成参考
+3. **附件内容**：从文档/图片提取信息
+
+### 历史记录管理
+- 支持工时表归档和管理
+- 时间线展示
+- 支持重新查看和导出
+
+## 开发最佳实践
+
+1. **优先使用现有组件**：避免重复造轮子
+2. **保持类型安全**：充分利用TypeScript
+3. **统一错误处理**：使用toast进行用户反馈
+4. **组件化思维**：将复杂功能拆分为小组件
+5. **状态管理规范**：合理使用Zustand store
+6. **用户体验优先**：提供清晰的反馈和引导 

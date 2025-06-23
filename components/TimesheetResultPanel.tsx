@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { toast } from "sonner";
 
 interface TimesheetResultPanelProps {
   currentResult: TimesheetResult | null;
@@ -26,7 +27,6 @@ interface TimesheetResultPanelProps {
   handleCopyTimesheet: () => void;
   handleArchive?: (name: string) => void;
   setActiveTab: (tab: "config" | "result" | "model" | "history") => void;
-  showNotification?: (type: "success" | "error", message: string) => void;
 }
 
 export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
@@ -40,7 +40,6 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
   handleCopyTimesheet,
   handleArchive,
   setActiveTab,
-  showNotification,
 }) => {
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [archiveName, setArchiveName] = useState("");
@@ -241,7 +240,7 @@ export const TimesheetResultPanel: React.FC<TimesheetResultPanelProps> = ({
                       <Button
                         onClick={() => {
                           navigator.clipboard.writeText(entry.workContent);
-                          showNotification?.("success", "工作内容已复制到剪贴板");
+                          toast.success("工作内容已复制到剪贴板");
                         }}
                         variant="ghost"
                         size="icon"

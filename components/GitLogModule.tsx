@@ -24,8 +24,15 @@ import {
   X,
   Eye,
   EyeOff,
+  Save,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { ConfirmDialog } from "./ui/confirm-dialog";
+import { InputDialog } from "./ui/input-dialog";
+import { toast } from "sonner";
 
 interface GitLogModuleProps {
   tasks: Task[];
@@ -47,6 +54,89 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
     accessToken: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [savedConfigs, setSavedConfigs] = useState<GitConfig[]>([]);
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+  
+  // 对话框状态
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState<string>("");
+
+  // 从本地存储加载配置
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('git-configs');
+      if (saved) {
+        const configs = JSON.parse(saved);
+        setSavedConfigs(configs);
+      }
+    } catch (error) {
+      console.error('加载Git配置失败:', error);
+    }
+  }, []);
+
+  // 保存配置到本地存储
+  const saveConfigsToStorage = (configs: GitConfig[]) => {
+    try {
+      localStorage.setItem('git-configs', JSON.stringify(configs));
+      setSavedConfigs(configs);
+    } catch (error) {
+      console.error('保存Git配置失败:', error);
+    }
+  };
+
+  // 保存当前配置
+  const handleSaveConfig = () => {
+    if (!gitConfig.repoUrl || !gitConfig.username) {
+      toast.error('请先填写仓库地址和用户名');
+      return;
+    }
+    setShowSaveDialog(true);
+  };
+
+  // 确认保存配置
+  const handleConfirmSave = (configName: string) => {
+    const newConfig: GitConfig = {
+      ...gitConfig,
+      id: Date.now().toString(),
+      name: configName,
+      savedAt: new Date().toISOString(),
+    };
+
+    const updatedConfigs = [...savedConfigs, newConfig];
+    saveConfigsToStorage(updatedConfigs);
+    toast.success('配置已保存');
+  };
+
+  // 加载选中的配置
+  const handleLoadConfig = (configId: string) => {
+    const config = savedConfigs.find(c => c.id === configId);
+    if (config) {
+      setGitConfig({
+        repoUrl: config.repoUrl,
+        username: config.username,
+        branch: config.branch || 'main',
+        accessToken: config.accessToken || '',
+      });
+      setSelectedConfigId(configId);
+    }
+  };
+
+  // 删除配置
+  const handleDeleteConfig = (configId: string) => {
+    setConfigToDelete(configId);
+    setShowDeleteDialog(true);
+  };
+
+  // 确认删除配置
+  const handleConfirmDelete = () => {
+    const updatedConfigs = savedConfigs.filter(c => c.id !== configToDelete);
+    saveConfigsToStorage(updatedConfigs);
+    if (selectedConfigId === configToDelete) {
+      setSelectedConfigId('');
+    }
+    toast.success('配置已删除');
+  };
 
   // 解析Git日志文本
   const parseGitLog = (logText: string): GitLogEntry[] => {
@@ -158,7 +248,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
     setParsedLogs(logs);
 
     if (logs.length === 0) {
-      alert("未能解析到有效的Git日志，请检查格式");
+      toast.error("未能解析到有效的Git日志，请检查格式");
       return;
     }
 
@@ -181,7 +271,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   // 自动爬取Git日志
   const handleAutoFetch = async () => {
     if (!gitConfig.repoUrl || !gitConfig.username) {
-      alert("请先配置Git仓库信息");
+      toast.error("请先配置Git仓库信息");
       setIsConfigOpen(true);
       return;
     }
@@ -204,7 +294,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
       setParsedLogs(parseGitLog(logs));
     } catch (error) {
       console.error("自动爬取失败:", error);
-      alert("自动爬取失败，请检查配置或手动粘贴日志");
+      toast.error("自动爬取失败，请检查配置或手动粘贴日志");
     } finally {
       setIsLoading(false);
     }
@@ -213,7 +303,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
   // DOM抓取Git日志（无需令牌）
   const handleDOMFetch = async () => {
     if (!gitConfig.repoUrl || !gitConfig.username) {
-      alert("请先配置Git仓库信息（仓库地址和用户名即可）");
+      toast.error("请先配置Git仓库信息（仓库地址和用户名即可）");
       setIsConfigOpen(true);
       return;
     }
@@ -240,10 +330,10 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
       const { logs, count } = result;
       setGitLogText(logs);
       setParsedLogs(parseGitLog(logs));
-      alert(`成功抓取 ${count} 个提交记录！`);
+      toast.success(`成功抓取 ${count} 个提交记录！`);
     } catch (error) {
       console.error("DOM抓取失败:", error);
-      alert(
+      toast.error(
         `DOM抓取失败: ${error instanceof Error ? error.message : "未知错误"}`
       );
     } finally {
@@ -334,7 +424,57 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
         {isConfigOpen && (
           <Card className="p-4 bg-gray-50">
             <div className="space-y-3">
-              <Label className="font-medium">Git仓库配置</Label>
+              <div className="flex items-center justify-between">
+                <Label className="font-medium">Git仓库配置</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleSaveConfig}
+                    variant="outline"
+                    size="sm"
+                    title="保存当前配置到本地"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    保存配置
+                  </Button>
+                </div>
+              </div>
+
+              {/* 已保存的配置选择 */}
+              {savedConfigs.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm">加载已保存的配置</Label>
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedConfigId} onValueChange={handleLoadConfig}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="选择已保存的配置..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedConfigs.map((config) => (
+                          <SelectItem key={config.id} value={config.id!}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{config.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {new Date(config.savedAt!).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedConfigId && (
+                      <Button
+                        onClick={() => handleDeleteConfig(selectedConfigId)}
+                        variant="outline"
+                        size="sm"
+                        title="删除选中的配置"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">
@@ -474,6 +614,29 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           </div>
         )}
       </CardContent>
+
+      {/* 保存配置对话框 */}
+      <InputDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        title="保存Git配置"
+        description="请输入配置名称以便后续快速加载"
+        label="配置名称"
+        placeholder="例如：项目名 - 主仓库"
+        defaultValue={`${gitConfig.username} - ${gitConfig.repoUrl.split('/').pop()}`}
+        onConfirm={handleConfirmSave}
+      />
+
+      {/* 删除配置确认对话框 */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="删除配置"
+        description="确定要删除这个Git配置吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleConfirmDelete}
+        variant="destructive"
+      />
     </Card>
   );
 };

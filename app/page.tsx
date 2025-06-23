@@ -12,8 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 import {
   Calendar,
   Clock,
@@ -23,8 +23,6 @@ import {
   Settings,
   Plus,
   Trash2,
-  CheckCircle,
-  AlertCircle,
   Brain,
   Zap,
   Sparkles,
@@ -72,18 +70,8 @@ export default function TimesheetAgentPage() {
 
   const [activeTab, setActiveTab] = useState<"config" | "result" | "model" | "history">("config");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
   const [processingStep, setProcessingStep] = useState<string>("");
   const [progress, setProgress] = useState<number>(0);
-
-  // 显示通知
-  const showNotification = (type: "success" | "error", message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 3000);
-  };
 
   // 生成工时表
   const handleGenerateTimesheet = async () => {
@@ -152,10 +140,10 @@ export default function TimesheetAgentPage() {
       setProgress(100);
 
       setActiveTab("result");
-      showNotification("success", "工时表生成成功！");
+      toast.success("工时表生成成功！");
     } catch (error) {
       console.error("生成工时表失败:", error);
-      showNotification("error", "生成工时表失败，请检查配置");
+      toast.error("生成工时表失败，请检查配置");
     } finally {
       setIsGenerating(false);
       setProcessingStep("");
@@ -171,7 +159,7 @@ export default function TimesheetAgentPage() {
       priority: "medium",
       description: "",
     });
-    showNotification("success", "任务已添加");
+    toast.success("任务已添加");
   };
 
   // 复制工时表
@@ -181,12 +169,12 @@ export default function TimesheetAgentPage() {
     try {
       const success = await ExportService.copyToClipboard(currentResult.entries);
       if (success) {
-        showNotification("success", "工时表已复制到剪贴板");
+        toast.success("工时表已复制到剪贴板");
       } else {
-        showNotification("error", "复制失败，请重试");
+        toast.error("复制失败，请重试");
       }
     } catch (error) {
-      showNotification("error", "复制失败");
+      toast.error("复制失败");
     }
   };
 
@@ -195,9 +183,9 @@ export default function TimesheetAgentPage() {
     if (!currentResult) return;
     try {
       ExportService.exportToExcel(currentResult.entries);
-      showNotification("success", "Excel文件已导出");
+      toast.success("Excel文件已导出");
     } catch (error) {
-      showNotification("error", "导出Excel失败");
+      toast.error("导出Excel失败");
     }
   };
 
@@ -206,9 +194,9 @@ export default function TimesheetAgentPage() {
     if (!currentResult) return;
     try {
       ExportService.exportToCSV(currentResult.entries);
-      showNotification("success", "CSV文件已导出");
+      toast.success("CSV文件已导出");
     } catch (error) {
-      showNotification("error", "导出CSV失败");
+      toast.error("导出CSV失败");
     }
   };
 
@@ -217,9 +205,9 @@ export default function TimesheetAgentPage() {
     if (!currentResult) return;
     try {
       ExportService.exportToText(currentResult.entries);
-      showNotification("success", "文本文件已导出");
+      toast.success("文本文件已导出");
     } catch (error) {
-      showNotification("error", "导出文本失败");
+      toast.error("导出文本失败");
     }
   };
 
@@ -230,7 +218,7 @@ export default function TimesheetAgentPage() {
     value: string | number
   ) => {
     updateTimesheetEntry(entry.id, { [field]: value });
-    showNotification("success", "已更新");
+    toast.success("已更新");
   };
 
   // 归档工时表
@@ -238,9 +226,9 @@ export default function TimesheetAgentPage() {
     if (!currentResult) return;
     try {
       saveResult(name);
-      showNotification("success", "工时表已归档保存");
+      toast.success("工时表已归档保存");
     } catch (error) {
-      showNotification("error", "归档失败");
+      toast.error("归档失败");
     }
   };
 
@@ -248,35 +236,21 @@ export default function TimesheetAgentPage() {
   const handleViewHistoryResult = (result: TimesheetResult) => {
     viewHistoryResult(result);
     setActiveTab("result");
-    showNotification("success", "已加载历史记录");
+    toast.success("已加载历史记录");
   };
 
   // 导出历史记录
   const handleExportHistoryResult = (result: TimesheetResult) => {
     try {
       ExportService.exportToExcel(result.entries);
-      showNotification("success", "历史记录已导出");
+      toast.success("历史记录已导出");
     } catch (error) {
-      showNotification("error", "导出失败");
+      toast.error("导出失败");
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 通知 */}
-      {notification && (
-        <div className="fixed top-4 right-4 z-50">
-          <Alert variant={notification.type === "error" ? "destructive" : "default"}>
-            {notification.type === "success" ? (
-              <CheckCircle className="h-4 w-4" />
-            ) : (
-              <AlertCircle className="h-4 w-4" />
-            )}
-            <AlertDescription>{notification.message}</AlertDescription>
-          </Alert>
-        </div>
-      )}
-
       <div className="container mx-auto px-4 py-8">
         {/* 页面头部 */}
         <div className="text-center mb-8">
@@ -362,7 +336,6 @@ export default function TimesheetAgentPage() {
               handleCopyTimesheet={handleCopyTimesheet}
               handleArchive={handleArchive}
               setActiveTab={(tab) => setActiveTab(tab as "config" | "result" | "model" | "history")}
-              showNotification={showNotification}
             />
           </TabsContent>
 

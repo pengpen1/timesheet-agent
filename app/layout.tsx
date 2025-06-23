@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "TimesheetAgent - 智能工时填报器",
@@ -21,6 +22,7 @@ export default function RootLayout({
         <div className="relative flex min-h-screen flex-col">
           <main className="flex-1">{children}</main>
         </div>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

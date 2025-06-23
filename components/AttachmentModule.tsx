@@ -14,6 +14,7 @@ import {
   X
 } from "lucide-react";
 import type { Task } from "@/types/types";
+import { toast } from "sonner";
 
 interface AttachmentItem {
   id: string;
@@ -125,7 +126,7 @@ export const AttachmentModule: React.FC<AttachmentModuleProps> = ({
       setAttachmentItems(prev => [...prev, attachmentItem]);
     } catch (error) {
       console.error('处理文件失败:', error);
-      alert(`处理文件 ${file.name} 失败`);
+      toast.error(`处理文件 ${file.name} 失败`);
     }
   };
 
@@ -162,7 +163,7 @@ export const AttachmentModule: React.FC<AttachmentModuleProps> = ({
   // 处理附件内容作为AI参考
   const handleAddAttachmentReference = () => {
     if (!attachmentContent.trim() && attachmentItems.length === 0) {
-      alert('请先添加内容或粘贴文件');
+      toast.error('请先添加内容或粘贴文件');
       return;
     }
 
@@ -208,7 +209,7 @@ export const AttachmentModule: React.FC<AttachmentModuleProps> = ({
       
     } catch (error) {
       console.error('添加附件参考失败:', error);
-      alert('添加失败，请重试');
+      toast.error('添加失败，请重试');
     } finally {
       setIsProcessing(false);
     }

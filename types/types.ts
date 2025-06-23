@@ -144,11 +144,14 @@ export interface ModelConfigStore {
 
 // Git配置类型
 export interface GitConfig {
+  id?: string
+  name?: string
   repoUrl: string
   username: string
   branch?: string
   privateKey?: string
   accessToken?: string
+  savedAt?: string
 }
 
 // Git日志条目
