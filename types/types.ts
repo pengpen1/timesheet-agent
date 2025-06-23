@@ -79,11 +79,15 @@ export interface StorageData {
   lastUsedConfig?: ProjectConfig
 }
 
+// 流式回调类型
+export type StreamCallback = (stepId: string, content: string) => void
+
 // Agent 相关类型
 export interface TaskAgentInput {
   tasks: Task[]
   workDays: WorkDay[]
   distributionMode: ProjectConfig['distributionMode']
+  onStreamContent?: StreamCallback
 }
 
 export interface TaskAgentOutput {
@@ -102,6 +106,7 @@ export interface TaskAgentOutput {
 export interface TimesheetAgentInput {
   taskAssignments: TaskAgentOutput['dailyAssignments']
   workContent?: string
+  onStreamContent?: StreamCallback
 }
 
 export interface TimesheetAgentOutput {
@@ -177,3 +182,32 @@ export interface Attachment {
 
 // 任务来源类型
 export type TaskSource = 'manual' | 'gitlog' | 'attachment'
+
+// 处理步骤和进度类型
+export interface ProcessingStep {
+  id: string
+  name: string
+  description: string
+  status: 'pending' | 'processing' | 'completed' | 'error'
+  progress: number
+  startTime?: string
+  endTime?: string
+  details?: string
+  streamContent?: string
+}
+
+export interface ProcessingState {
+  currentStep: string
+  steps: ProcessingStep[]
+  overallProgress: number
+  isProcessing: boolean
+  showStreamDialog: boolean
+}
+
+// 生成完成确认弹框状态
+export interface GenerationCompleteState {
+  isVisible: boolean
+  autoRedirectTimer?: number
+  onConfirm: () => void
+  onCancel: () => void
+}

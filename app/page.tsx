@@ -39,11 +39,12 @@ import { TaskAgent } from "@/lib/agents/taskAgent";
 import { TimesheetAgent } from "@/lib/agents/timesheetAgent";
 import { ExportService } from "@/lib/export";
 import { generateWorkDays } from "@/lib/utils";
-import { TimesheetEntry, TimesheetResult } from "@/types/types";
+import { TimesheetEntry, TimesheetResult, ProcessingState, ProcessingStep } from "@/types/types";
 import { TaskConfigPanel } from "@/components/TaskConfigPanel";
 import { TimesheetResultPanel } from "@/components/TimesheetResultPanel";
 import { ModelConfigPanel } from "@/components/ModelConfigPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { GenerationCompleteDialog } from "@/components/ui/generation-complete-dialog";
 import Image from "next/image";
 
 export default function TimesheetAgentPage() {
@@ -70,23 +71,124 @@ export default function TimesheetAgentPage() {
 
   const [activeTab, setActiveTab] = useState<"config" | "result" | "model" | "history">("config");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [processingStep, setProcessingStep] = useState<string>("");
-  const [progress, setProgress] = useState<number>(0);
+  
+  // 处理状态管理
+  const [processingState, setProcessingState] = useState<ProcessingState>({
+    currentStep: '',
+    steps: [],
+    overallProgress: 0,
+    isProcessing: false,
+    showStreamDialog: false
+  });
+  
+  // 生成完成确认弹框状态
+  const [showGenerationCompleteDialog, setShowGenerationCompleteDialog] = useState(false);
+
+  // 更新处理状态
+  const updateProcessingState = (updates: Partial<ProcessingState>) => {
+    setProcessingState(prev => ({ ...prev, ...updates }));
+  };
+
+  // 更新步骤状态
+  const updateStep = (stepId: string, updates: Partial<ProcessingStep>) => {
+    setProcessingState(prev => ({
+      ...prev,
+      steps: prev.steps.map(step => 
+        step.id === stepId ? { ...step, ...updates } : step
+      )
+    }));
+  };
+
+  // 添加流式内容
+  const appendStreamContent = (stepId: string, content: string) => {
+    updateStep(stepId, {
+      streamContent: (processingState.steps.find(s => s.id === stepId)?.streamContent || '') + content
+    });
+  };
 
   // 生成工时表
   const handleGenerateTimesheet = async () => {
     try {
       clearMessages();
       setIsGenerating(true);
-      setProgress(0);
 
       // 验证输入
       if (currentConfig.tasks.length === 0) {
         throw new Error("请至少添加一个任务");
       }
 
-      setProcessingStep("正在分析任务和工作日...");
-      setProgress(20);
+      // 初始化处理步骤
+      const steps: ProcessingStep[] = [
+        {
+          id: 'validate',
+          name: '输入验证',
+          description: '验证任务配置和工作日设置',
+          status: 'pending',
+          progress: 0
+        },
+        {
+          id: 'analyze',
+          name: '分析任务',
+          description: '分析任务类型和工作日历，生成工作日列表',
+          status: 'pending',
+          progress: 0
+        },
+        {
+          id: 'distribute',
+          name: '智能分配',
+          description: 'TaskAgent正在智能分配工时到每个工作日',
+          status: 'pending',
+          progress: 0
+        },
+        {
+          id: 'generate',
+          name: '生成工时表',
+          description: 'TimesheetAgent正在生成最终的工时表条目',
+          status: 'pending',
+          progress: 0
+        },
+        {
+          id: 'finalize',
+          name: '完成处理',
+          description: '计算统计信息并保存结果',
+          status: 'pending',
+          progress: 0
+        }
+      ];
+
+      setProcessingState({
+        currentStep: 'validate',
+        steps,
+        overallProgress: 0,
+        isProcessing: true,
+        showStreamDialog: false
+      });
+
+      // 步骤1：输入验证
+      updateStep('validate', { 
+        status: 'processing', 
+        startTime: new Date().toISOString(),
+        streamContent: '🔍 开始验证输入配置...\n'
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 500)); // 模拟处理时间
+      
+      appendStreamContent('validate', `✅ 找到 ${currentConfig.tasks.length} 个任务\n`);
+      appendStreamContent('validate', `📅 日期范围: ${currentConfig.dateRange.startDate} 到 ${currentConfig.dateRange.endDate}\n`);
+      
+      updateStep('validate', { 
+        status: 'completed', 
+        progress: 100,
+        endTime: new Date().toISOString()
+      });
+      setProcessingState(prev => ({ ...prev, currentStep: 'analyze', overallProgress: 20 }));
+
+      // 步骤2：分析任务
+      updateStep('analyze', { 
+        status: 'processing', 
+        startTime: new Date().toISOString(),
+        streamContent: '📊 正在分析任务和生成工作日...\n'
+      });
 
       // 生成工作日
       const workDays = generateWorkDays(
@@ -99,23 +201,97 @@ export default function TimesheetAgentPage() {
         currentConfig.workingHours.isCurrentWeekBig
       );
 
-      setProcessingStep("TaskAgent正在智能分配任务...");
-      setProgress(40);
+      const workingDays = workDays.filter(d => d.isWorkday && !d.isHoliday);
+      appendStreamContent('analyze', `📋 生成了 ${workDays.length} 天日历，其中 ${workingDays.length} 个工作日\n`);
+      appendStreamContent('analyze', `⏰ 每日工作时长: ${currentConfig.workingHours.dailyHours} 小时\n`);
+      
+      updateStep('analyze', { 
+        status: 'completed', 
+        progress: 100,
+        endTime: new Date().toISOString()
+      });
+      setProcessingState(prev => ({ ...prev, currentStep: 'distribute', overallProgress: 40 }));
 
-      // TaskAgent 处理
+      // 步骤3：智能分配
+      updateStep('distribute', { 
+        status: 'processing', 
+        startTime: new Date().toISOString(),
+        streamContent: '🤖 TaskAgent开始智能分配工时...\n'
+      });
+
+      appendStreamContent('distribute', `📋 分配策略: ${currentConfig.distributionMode === 'daily' ? '按天平均分配' : currentConfig.distributionMode === 'priority' ? '按优先级分配' : '按功能分配'}\n`);
+      
+      updateStep('distribute', { progress: 30 });
+      
+      // TaskAgent 处理 - 使用真正的流式回调
       const taskAgentOutput = await TaskAgent.process({
         tasks: [...currentConfig.tasks],
         workDays,
         distributionMode: currentConfig.distributionMode,
+        onStreamContent: (stepId: string, content: string) => {
+          // 将AI流式内容添加到当前步骤
+          appendStreamContent('distribute', content);
+          
+          // 根据内容更新进度
+          if (content.includes('连接AI模型')) {
+            updateStep('distribute', { progress: 40 });
+          } else if (content.includes('AI智能分配完成')) {
+            updateStep('distribute', { progress: 90 });
+          }
+        }
       });
 
-      setProcessingStep("TimesheetAgent正在生成工时表...");
-      setProgress(80);
+      appendStreamContent('distribute', `✅ 成功分配到 ${taskAgentOutput.dailyAssignments.length} 个工作日\n`);
+      
+      updateStep('distribute', { 
+        status: 'completed', 
+        progress: 100,
+        endTime: new Date().toISOString()
+      });
+      setProcessingState(prev => ({ ...prev, currentStep: 'generate', overallProgress: 70 }));
 
-      // TimesheetAgent 处理
+      // 步骤4：生成工时表
+      updateStep('generate', { 
+        status: 'processing', 
+        startTime: new Date().toISOString(),
+        streamContent: '📝 TimesheetAgent开始生成工时表...\n'
+      });
+
+      updateStep('generate', { progress: 30 });
+      
+      // TimesheetAgent 处理 - 使用真正的流式回调
       const timesheetAgentOutput = TimesheetAgent.process({
         taskAssignments: taskAgentOutput.dailyAssignments,
         workContent: currentConfig.workContent,
+        onStreamContent: (stepId: string, content: string) => {
+          // 将流式内容添加到生成步骤
+          appendStreamContent('generate', content);
+          
+          // 根据内容更新进度
+          if (content.includes('转换任务分配')) {
+            updateStep('generate', { progress: 50 });
+          } else if (content.includes('计算剩余工时')) {
+            updateStep('generate', { progress: 80 });
+          } else if (content.includes('工时表生成完成')) {
+            updateStep('generate', { progress: 95 });
+          }
+        }
+      });
+
+      appendStreamContent('generate', `✅ 生成了 ${timesheetAgentOutput.timesheet.length} 条工时记录\n`);
+      
+      updateStep('generate', { 
+        status: 'completed', 
+        progress: 100,
+        endTime: new Date().toISOString()
+      });
+      setProcessingState(prev => ({ ...prev, currentStep: 'finalize', overallProgress: 90 }));
+
+      // 步骤5：完成处理
+      updateStep('finalize', { 
+        status: 'processing', 
+        startTime: new Date().toISOString(),
+        streamContent: '🔧 正在计算统计信息...\n'
       });
 
       // 计算统计信息
@@ -125,6 +301,11 @@ export default function TimesheetAgentPage() {
       );
       const totalDays = timesheetAgentOutput.timesheet.length;
       const averageHoursPerDay = totalDays > 0 ? totalHours / totalDays : 0;
+
+      appendStreamContent('finalize', `📈 统计信息:\n`);
+      appendStreamContent('finalize', `   - 总工时: ${totalHours} 小时\n`);
+      appendStreamContent('finalize', `   - 工作天数: ${totalDays} 天\n`);
+      appendStreamContent('finalize', `   - 平均每日工时: ${averageHoursPerDay.toFixed(1)} 小时\n`);
 
       setCurrentResult({
         entries: timesheetAgentOutput.timesheet,
@@ -136,18 +317,40 @@ export default function TimesheetAgentPage() {
         generatedAt: new Date().toISOString(),
       }, true);
 
-      setProcessingStep("完成生成...");
-      setProgress(100);
+      updateStep('finalize', { 
+        status: 'completed', 
+        progress: 100,
+        endTime: new Date().toISOString()
+      });
+      setProcessingState(prev => ({ ...prev, overallProgress: 100 }));
 
-      setActiveTab("result");
+      appendStreamContent('finalize', '🎉 工时表生成完成！\n');
+
+      // 显示生成完成确认弹框，而不是直接跳转
+      setShowGenerationCompleteDialog(true);
       toast.success("工时表生成成功！");
+      
+      // 1秒后自动结束处理状态
+      setTimeout(() => {
+        setProcessingState(prev => ({ ...prev, isProcessing: false }));
+      }, 1000);
+
     } catch (error) {
       console.error("生成工时表失败:", error);
+      
+      // 更新当前步骤为错误状态
+      if (processingState.currentStep) {
+        updateStep(processingState.currentStep, { 
+          status: 'error',
+          endTime: new Date().toISOString()
+        });
+        appendStreamContent(processingState.currentStep, `❌ 错误: ${error instanceof Error ? error.message : '未知错误'}\n`);
+      }
+      
       toast.error("生成工时表失败，请检查配置");
+      setProcessingState(prev => ({ ...prev, isProcessing: false }));
     } finally {
       setIsGenerating(false);
-      setProcessingStep("");
-      setProgress(0);
     }
   };
 
@@ -249,6 +452,17 @@ export default function TimesheetAgentPage() {
     }
   };
 
+  // 处理生成完成确认
+  const handleGenerationComplete = () => {
+    setShowGenerationCompleteDialog(false);
+    setActiveTab("result");
+  };
+
+  // 处理生成完成取消
+  const handleGenerationCancel = () => {
+    setShowGenerationCompleteDialog(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -313,13 +527,12 @@ export default function TimesheetAgentPage() {
           <TabsContent value="config" className="space-y-6">
             <TaskConfigPanel
               currentConfig={currentConfig}
-              isGenerating={isGenerating}
-              processingStep={processingStep}
-              progress={progress}
+              processingState={processingState}
               updateConfig={updateConfig}
               addTask={addTask}
               deleteTask={deleteTask}
               handleGenerateTimesheet={handleGenerateTimesheet}
+              updateProcessingState={updateProcessingState}
             />
           </TabsContent>
 
@@ -355,6 +568,14 @@ export default function TimesheetAgentPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* 生成完成确认弹框 */}
+      <GenerationCompleteDialog
+        open={showGenerationCompleteDialog}
+        onConfirm={handleGenerationComplete}
+        onCancel={handleGenerationCancel}
+        autoRedirectSeconds={3}
+      />
     </div>
   );
 }

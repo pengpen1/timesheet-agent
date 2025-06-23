@@ -15,18 +15,25 @@ export class TimesheetAgent {
    * 主要处理方法：生成工时表
    */
   static process(input: TimesheetAgentInput): TimesheetAgentOutput {
-    const { taskAssignments, workContent } = input
+    const { taskAssignments, workContent, onStreamContent } = input
     
     // 验证输入
     this.validateInput(input)
     
+    onStreamContent?.('generate', '📋 开始转换任务分配为工时表条目...\n')
+    
     // 转换为工时表条目
-    const timesheet = taskAssignments.map(assignment => 
-      this.convertAssignmentToTimesheet(assignment, workContent)
-    ).flat()
+    const timesheet = taskAssignments.map((assignment, index) => {
+      onStreamContent?.('generate', `⚡ 处理第${index + 1}天的任务分配 (${assignment.date})...\n`)
+      return this.convertAssignmentToTimesheet(assignment, workContent)
+    }).flat()
+    
+    onStreamContent?.('generate', '🧮 计算剩余工时...\n')
     
     // 计算剩余工时
     this.calculateRemainingHours(timesheet)
+    
+    onStreamContent?.('generate', `✅ 工时表生成完成，共${timesheet.length}条记录\n`)
     
     return { timesheet }
   }

@@ -7,41 +7,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Calendar, CalendarDays, CalendarRange } from "lucide-react";
-import type { ProjectConfig } from "@/types/types";
+import type { ProjectConfig, ProcessingState } from "@/types/types";
 import { getCurrentWeekRange, getCurrentMonthRange } from "@/lib/utils";
 import { TaskManagementContainer } from "./TaskManagementContainer";
 
 interface TaskConfigPanelProps {
   currentConfig: ProjectConfig;
-  isGenerating: boolean;
-  processingStep: string;
-  progress: number;
+  processingState: ProcessingState;
   updateConfig: (config: Partial<ProjectConfig>) => void;
   addTask: (task: Omit<import("@/types/types").Task, "id">) => void;
   deleteTask: (taskId: string) => void;
   handleGenerateTimesheet: () => void;
+  updateProcessingState: (updates: Partial<ProcessingState>) => void;
 }
 
 export const TaskConfigPanel: React.FC<TaskConfigPanelProps> = ({
   currentConfig,
-  isGenerating,
-  processingStep,
-  progress,
+  processingState,
   updateConfig,
   addTask,
   deleteTask,
   handleGenerateTimesheet,
+  updateProcessingState,
 }) => {
   return (
     <div className="space-y-6">
       {/* 任务管理容器 */}
       <TaskManagementContainer
         currentConfig={currentConfig}
-        isGenerating={isGenerating}
-        processingStep={processingStep}
-        progress={progress}
+        processingState={processingState}
         updateConfig={updateConfig}
         handleGenerateTimesheet={handleGenerateTimesheet}
+        updateProcessingState={updateProcessingState}
       />
       
       {/* 工作参数 */}
