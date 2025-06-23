@@ -60,6 +60,7 @@ export default function TimesheetAgentPage() {
     addTask,
     deleteTask,
     setCurrentResult,
+    viewHistoryResult,
     setIsGenerating,
     clearMessages,
     exportAsText,
@@ -145,7 +146,7 @@ export default function TimesheetAgentPage() {
           averageHoursPerDay,
         },
         generatedAt: new Date().toISOString(),
-      });
+      }, true);
 
       setProcessingStep("完成生成...");
       setProgress(100);
@@ -245,7 +246,7 @@ export default function TimesheetAgentPage() {
 
   // 查看历史记录
   const handleViewHistoryResult = (result: TimesheetResult) => {
-    setCurrentResult(result);
+    viewHistoryResult(result);
     setActiveTab("result");
     showNotification("success", "已加载历史记录");
   };

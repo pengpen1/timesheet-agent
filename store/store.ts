@@ -28,7 +28,8 @@ interface TimesheetStore {
   loadConfig: (config: ProjectConfig) => void
   deleteConfig: (index: number) => void
   
-  setCurrentResult: (result: TimesheetResult) => void
+  setCurrentResult: (result: TimesheetResult, autoSave?: boolean) => void
+  viewHistoryResult: (result: TimesheetResult) => void
   saveResult: (name?: string) => void
   deleteResult: (index: number) => void
   updateTimesheetEntry: (entryId: string, updates: Partial<TimesheetEntry>) => void
@@ -110,14 +111,18 @@ export const useTimesheetStore = create<TimesheetStore>()(
       },
 
       // 结果管理
-      setCurrentResult: (result) => {
+      setCurrentResult: (result, autoSave = true) => {
         set({ currentResult: result })
         
         // 自动保存
         const { currentConfig } = get()
-        if (currentConfig.autoSave) {
+        if (autoSave && currentConfig.autoSave) {
           get().saveResult()
         }
+      },
+
+      viewHistoryResult: (result) => {
+        set({ currentResult: result })
       },
 
       saveResult: (name?: string) => {

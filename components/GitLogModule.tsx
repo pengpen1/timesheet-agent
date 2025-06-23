@@ -210,6 +210,47 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
     }
   };
 
+  // DOM抓取Git日志（无需令牌）
+  const handleDOMFetch = async () => {
+    if (!gitConfig.repoUrl || !gitConfig.username) {
+      alert("请先配置Git仓库信息（仓库地址和用户名即可）");
+      setIsConfigOpen(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // 调用DOM抓取API
+      const response = await fetch("/api/git/fetch-logs-dom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repoUrl: gitConfig.repoUrl,
+          username: gitConfig.username,
+          branch: gitConfig.branch,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "DOM抓取失败");
+      }
+
+      const { logs, count } = result;
+      setGitLogText(logs);
+      setParsedLogs(parseGitLog(logs));
+      alert(`成功抓取 ${count} 个提交记录！`);
+    } catch (error) {
+      console.error("DOM抓取失败:", error);
+      alert(
+        `DOM抓取失败: ${error instanceof Error ? error.message : "未知错误"}`
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const gitLogTaskCount = tasks.filter((t) => t.source === "gitlog").length;
 
   return (
@@ -220,8 +261,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           Git日志
         </CardTitle>
         <CardDescription>
-          如您不想使用令牌或者自动化爬取，也可以手动复制日志：git log
-          --author="用户名" --since="30 days ago" --oneline
+          支持两种自动抓取方案，也可手动复制日志：git log --author="用户名" --since="30 days ago" --oneline
           {gitLogTaskCount > 0 && (
             <Badge variant="secondary" className="ml-2">
               已添加 {gitLogTaskCount} 个参考
@@ -237,27 +277,44 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
             variant="outline"
             size="sm"
             disabled={!gitLogText.trim()}
+            title="整理和格式化Git日志文本，去除多余空行和空格"
           >
             <FileText className="h-4 w-4 mr-1" />
             格式化
           </Button>
-          <Button
+                    <Button
             onClick={handleAutoFetch}
             variant="outline"
             size="sm"
             disabled={isLoading}
+            title="方案1：API抓取 - 需要访问令牌，支持私有仓库，所有部署平台可用，更稳定可靠"
           >
             {isLoading ? (
               <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <Download className="h-4 w-4 mr-1" />
             )}
-            自动爬取
+            API抓取
+          </Button>
+          <Button
+            onClick={handleDOMFetch}
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+            title="方案2：DOM抓取 - 无需访问令牌，仅支持公开仓库，部分部署平台可用（如Vercel不支持）"
+          >
+            {isLoading ? (
+              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1" />
+            )}
+            DOM抓取
           </Button>
           <Button
             onClick={() => setIsConfigOpen(!isConfigOpen)}
             variant="outline"
             size="sm"
+            title="配置Git仓库信息：仓库地址、用户名、分支、访问令牌等"
           >
             <Settings className="h-4 w-4 mr-1" />
             设置
@@ -266,6 +323,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
             onClick={() => navigator.clipboard?.readText().then(setGitLogText)}
             variant="outline"
             size="sm"
+            title="从剪贴板粘贴Git日志内容，支持多种格式"
           >
             <Clipboard className="h-4 w-4 mr-1" />
             粘贴
@@ -400,6 +458,7 @@ export const GitLogModule: React.FC<GitLogModuleProps> = ({
           onClick={handleProcessGitLog}
           disabled={!gitLogText.trim()}
           className="w-full"
+          title="将Git日志解析并添加为AI生成工时表时的参考内容，不占用实际工时"
         >
           <GitBranch className="h-4 w-4 mr-2" />
           添加为AI参考内容 ({parsedLogs.length} 条日志)

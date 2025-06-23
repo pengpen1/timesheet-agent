@@ -41,6 +41,7 @@
     "mime-types": "^3.0.1",
     "multer": "^2.0.1",
     "next": "^15.0.0",
+    "playwright": "^1.53.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.58.0",
